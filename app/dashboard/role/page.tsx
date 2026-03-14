@@ -1,0 +1,540 @@
+'use client';
+
+import CustomHeader from '@/components/layout/header/customheader/CustomHeader';
+import { useWebSocket } from '@/hooks/useWebSocket';
+import factory from '@/public/assets/images/Factory.png';
+import sideArrow from '@/public/assets/images/sideArrow.png';
+import woodenBg from '@/public/assets/images/wooden_bg.png';
+import woodenHeading from '@/public/assets/images/woodenHeading.png';
+import { authService } from '@/services/authService';
+import { lobbyService } from '@/services/lobbyService';
+import { useAuthStore } from '@/stores/authStore';
+import { useUserStore } from '@/stores/userStore';
+import { PlayerRole } from '@/types/besse';
+import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+
+export default function RolePage() {
+  const [selectedRole, setSelectedRole] = useState<number | null>(null);
+  const [openDetailId, setOpenDetailId] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string>('');
+  const [lobbyState, setLobbyState] = useState<any>(null);
+  const [leader, setLeader] = useState<string>('');
+  const [userInfo, setUserInfo] = useState<any>(null);
+
+  const { user } = useAuthStore();
+  const { pairingStatus } = useUserStore();
+  const { subscribe, isConnected, joinGame } = useWebSocket();
+  const router = useRouter();
+
+  const getRolesWithPlayerNames = () => {
+    const baseRoles = [
+      {
+        id: 1,
+        title: 'Municipality',
+        role: 'municipality' as PlayerRole,
+        name: '',
+        description: [
+          "Check the city health data, how they are affected by all three role's actions",
+          'If one of them is too high or low, game over',
+          'The data can affect the cost (Sem B)',
+        ],
+      },
+      {
+        id: 2,
+        title: 'MRF',
+        role: 'mrf' as PlayerRole,
+        name: '',
+        description: [
+          'Check the Waste Composition, how they are affected by production',
+          'High cost → more organic waste',
+          'More organic → less pollution',
+          'More chemical, xxx → worse pollution',
+          'They can dump different types of waste',
+        ],
+      },
+      {
+        id: 3,
+        title: 'Broker',
+        role: 'broker' as PlayerRole,
+        name: '',
+        description: [
+          "Check the Trade Desk, the three actions' trade when expensive, cheap",
+          'They can check if the production income increases or decreases',
+          'Companies, types would be also different (Sem B)',
+        ],
+      },
+    ];
+
+    if (!lobbyState?.players) return baseRoles;
+
+    return baseRoles.map((role) => {
+      const player = lobbyState.players.find((p: any) => p.selectedRole === role.role);
+      return {
+        ...role,
+        name: player ? player.name : role.name,
+      };
+    });
+  };
+
+  useEffect(() => {
+    const fetchLobbyState = async () => {
+      const profileResponse = await authService.getProfile();
+      if (!profileResponse.success || !profileResponse.data) {
+        throw new Error('Failed to get profile');
+      }
+      const userData = profileResponse.data.user;
+      setUserInfo(userData);
+      if (!userData?.currentSession) return;
+
+      try {
+        const response = await lobbyService.getLobbyState(userData.currentSession);
+        if (response.data?.lobbyState) {
+          setLobbyState(response.data.lobbyState);
+          setLeader(response.data.lobbyState.leader);
+
+          // Set selected role based on user's current role
+          const currentPlayer = response.data.lobbyState.players.find(
+            (player: any) => player.userId === (user as any)._id
+          );
+          if (currentPlayer?.selectedRole) {
+            const roleData = getRolesWithPlayerNames().find(
+              (role) => role.role === currentPlayer.selectedRole
+            );
+            if (roleData) {
+              setSelectedRole(roleData.id);
+            }
+          }
+        }
+      } catch (err: any) {
+        console.error('Failed to fetch lobby state:', err);
+        setError('Failed to load lobby state');
+      }
+    };
+
+    fetchLobbyState();
+  }, [userInfo?.currentSession, userInfo?._id]);
+
+  const fetchLobbyState = async () => {
+    const profileResponse = await authService.getProfile();
+    if (!profileResponse.success || !profileResponse.data) {
+      throw new Error('Failed to get profile');
+    }
+    const userData = profileResponse.data.user;
+    setUserInfo(userData);
+    if (!userData?.currentSession) return;
+
+    try {
+      const response = await lobbyService.getLobbyState(userData.currentSession);
+      if (response.data?.lobbyState) {
+        setLobbyState(response.data.lobbyState);
+        setLeader(response.data.lobbyState.leader);
+
+        // Set selected role based on user's current role
+        const currentPlayer = response.data.lobbyState.players.find(
+          (player: any) => player.userId === (user as any)._id
+        );
+        if (currentPlayer?.selectedRole) {
+          const roleData = getRolesWithPlayerNames().find(
+            (role) => role.role === currentPlayer.selectedRole
+          );
+          if (roleData) {
+            setSelectedRole(roleData.id);
+          }
+        }
+      }
+    } catch (err: any) {
+      console.error('Failed to fetch lobby state:', err);
+      setError('Failed to load lobby state');
+    }
+  };
+
+  // Helper function to extract players from the game state
+  const extractPlayers = (data: any): Array<{ userId: string; selectedRole: string }> => {
+    const players: Array<{ userId: string; selectedRole: string }> = [];
+
+    // First try to get playerRoles mapping
+    if (data?.playerRoles && typeof data.playerRoles === 'object') {
+      // Convert the role-to-userId mapping to player objects
+      Object.entries(data.playerRoles).forEach(([role, userId]) => {
+        players.push({
+          userId: userId as string,
+          selectedRole: role,
+        });
+      });
+    }
+
+    // Also check for gameState.players (same structure)
+    if (data?.gameState?.players && typeof data.gameState.players === 'object') {
+      Object.entries(data.gameState.players).forEach(([role, userId]) => {
+        // Only add if not already added from playerRoles
+        if (!players.find((p) => p.userId === userId)) {
+          players.push({
+            userId: userId as string,
+            selectedRole: role,
+          });
+        }
+      });
+    }
+
+    return players;
+  };
+
+  // Subscribe to lobby state updates via WebSocket
+  useEffect(() => {
+    const unsubscribe = subscribe('lobby-state-update', (data: any) => {
+      if (data.sessionId === userInfo?.currentSession) {
+        fetchLobbyState();
+      }
+    });
+
+    const unSubcribeGameStarted = subscribe('game-started', (data: any) => {
+      console.log('Game started event received in role page:', data);
+      if (data?.sessionId === userInfo?.currentSession) {
+        const players = extractPlayers(data);
+        const currentPlayer = players.find((player: any) => player.userId === userInfo._id);
+
+        if (currentPlayer) {
+          if (currentPlayer.selectedRole === 'broker') {
+            router.push('/dashboard/broker-inventory');
+          } else if (currentPlayer.selectedRole === 'mrf') {
+            router.push('/dashboard/mrf-collection');
+          } else if (currentPlayer.selectedRole === 'municipality') {
+            router.push('/dashboard/municipality');
+          }
+        }
+      }
+    });
+
+    const unsubLobbyActivated = subscribe('lobby-activated', (data: any) => {
+      console.log('Lobby activated event received: in role page', data);
+
+      if (data?.lobby?.status === 'active') {
+        // For lobby-activated event, the structure might be different
+        let players: Array<{ userId: string; selectedRole: string }> = [];
+
+        if (Array.isArray(data?.lobby?.players)) {
+          // If players is an array with full player objects
+          players = data.lobby.players.map((player: any) => ({
+            userId: player.userId || player._id,
+            selectedRole: player.selectedRole,
+          }));
+        } else if (data?.lobby?.players && typeof data.lobby.players === 'object') {
+          // If it's a role-to-userId mapping
+          Object.entries(data.lobby.players).forEach(([role, userId]) => {
+            players.push({
+              userId: userId as string,
+              selectedRole: role,
+            });
+          });
+        }
+
+        const currentPlayer = players.find((player: any) => player.userId === userInfo._id);
+
+        if (currentPlayer) {
+          if (currentPlayer.selectedRole === 'broker') {
+            router.push('/dashboard/broker-inventory');
+          } else if (currentPlayer.selectedRole === 'mrf') {
+            router.push('/dashboard/mrf-collection');
+          } else if (currentPlayer.selectedRole === 'municipality') {
+            router.push('/dashboard/municipality');
+          }
+        }
+      }
+    });
+
+    console.log(unSubcribeGameStarted)
+
+    return () => {
+      unsubscribe && unsubscribe();
+      unsubLobbyActivated && unsubLobbyActivated();
+      unSubcribeGameStarted && unSubcribeGameStarted();
+    };
+  }, [subscribe, userInfo?.currentSession, userInfo?._id]);
+
+  // Ensure we're connected to the game room to receive game-started events
+  useEffect(() => {
+    if (userInfo?.currentSession && isConnected) {
+      console.log('Role page: Joining game room with sessionId:', userInfo.currentSession);
+      joinGame(userInfo.currentSession);
+    }
+  }, [userInfo?.currentSession, isConnected, joinGame]);
+
+  const toggleDetail = (id: number) => {
+    setOpenDetailId((prev) => (prev === id ? null : id));
+  };
+
+  const handleRoleSelection = async (sRole: number) => {
+    if (!sRole || !userInfo?.currentSession) {
+      setError('No role selected or session not found');
+      return;
+    }
+    const roles = getRolesWithPlayerNames();
+    const selectedRoleData = roles.find((role) => role.id === sRole);
+    if (!selectedRoleData) {
+      setError('Invalid role selection');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      // Check if this role is already selected by the current user
+      const currentPlayer = lobbyState?.players.find(
+        (player: any) => player.userId === userInfo?._id
+      );
+      const isAlreadySelected = currentPlayer?.selectedRole === selectedRoleData.role;
+
+      if (isAlreadySelected) {
+        // Deselect the role
+        await lobbyService.deSelectRole({
+          sessionId: userInfo.currentSession,
+          role: selectedRoleData.role,
+        });
+        setSelectedRole(null);
+      } else {
+        // Select the role
+        await lobbyService.selectRole({
+          sessionId: userInfo.currentSession,
+          role: selectedRoleData.role,
+        });
+        setSelectedRole(sRole);
+      }
+
+      // Refresh lobby state after role change
+      const response = await lobbyService.getLobbyState(userInfo.currentSession);
+      if (response.data?.lobbyState) {
+        setLobbyState(response.data.lobbyState);
+        setLeader(response.data.lobbyState.leader);
+
+        // Update selected role based on new lobby state
+        const updatedPlayer = response.data.lobbyState.players.find(
+          (player: any) => player.userId === userInfo._id
+        );
+        if (updatedPlayer?.selectedRole) {
+          const roleData = roles.find((role) => role.role === updatedPlayer.selectedRole);
+          if (roleData) {
+            setSelectedRole(roleData.id);
+          } else {
+            setSelectedRole(null);
+          }
+        } else {
+          setSelectedRole(null);
+        }
+      }
+    } catch (err: any) {
+      console.error('Role selection error:', err);
+      setError(err.response?.data?.message || 'Failed to select role. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleContinue = async () => {
+    if (lobbyState?.status !== 'ready') {
+      setError("All players didn't select the roles yet. Lobby is not ready.");
+      return;
+    }
+
+    if (userInfo?._id !== leader) {
+      setError('Only the lobby leader can continue to the next step.');
+      return;
+    }
+
+    // Navigate to pairing page
+    localStorage.setItem('pairing_session_id', userInfo.currentSession);
+    router.push(`/dashboard/pairing?sessionId=${userInfo.currentSession}`);
+  };
+
+  // Allow leader to continue when all roles are selected (lobby is ready)
+  const canContinue = Boolean(
+    selectedRole && lobbyState?.status === 'ready' && userInfo?._id === leader
+  );
+
+  return (
+    <div className="h-full flex items-center justify-center bgColor p-6">
+      <div
+        className="bg-cover bg-center container mx-auto rounded-[20px] relative w-full"
+        style={{
+          backgroundImage: `url(${woodenBg.src})`,
+        }}
+      >
+        <CustomHeader
+          backgroundImage={woodenHeading.src}
+          title="Select Role"
+          subtitle="Select a role to start playing the game"
+        />
+
+        <div className="md:px-8 px-4 pt-16 pb-6">
+          <div className="grid lg:grid-cols-3 md:grid-cols-2 grid-cols-1 lg:gap-6 gap-18 sm:gap-12">
+            {getRolesWithPlayerNames().map((role) => (
+              <div
+                key={role.id}
+                className={`relative flex flex-col items-center cursor-pointer min-h-[400px] sm:min-h-[450px] transition-all duration-300 ${
+                  selectedRole === role.id ? 'bg-[#5C9850]' : 'bg-white'
+                }`}
+                style={{ boxShadow: '0 5px 8px rgba(0, 0, 0, 0.4)' }}
+              >
+                {/* Decorative top element */}
+                <div className="absolute top-[-45px] w-10 h-[90px] bg-[#A77F46B2] z-10"></div>
+
+                {/* Main Content */}
+                <div
+                  className={`flex flex-col items-center w-full  ${
+                    openDetailId === role.id
+                      ? 'opacity-0 max-h-0 overflow-hidden'
+                      : 'opacity-100 max-h-[500px]'
+                  }`}
+                  onClick={() => {
+                    setSelectedRole(role.id);
+                    handleRoleSelection(role.id);
+                  }}
+                >
+                  <div className="mt-14 flex justify-center w-full max-w-full sm:max-w-md md:max-w-lg lg:max-w-xl mx-auto  xl:px-0  px-4">
+                    <Image src={factory} alt="factory" className=" h-auto object-cover" priority />
+                  </div>
+
+                  <h2
+                    className={`font-bold lg:text-[40px] md:text-[30px] text-[24px] font-roboto mt-4 text-center ${
+                      selectedRole === role.id ? 'text-white' : 'text-[#33552C]'
+                    }`}
+                  >
+                    {role.title}
+                  </h2>
+
+                  <p
+                    className={`font-medium text-[24px] font-roboto ${
+                      selectedRole === role.id ? 'text-white' : 'text-[#33552C]'
+                    }`}
+                  >
+                    {role.name}
+                  </p>
+
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleDetail(role.id);
+                    }}
+                    className={`px-6 py-2 text-[18px] sm:text-[20px] font-roboto mt-5 mb-6  ${
+                      selectedRole === role.id
+                        ? 'bg-white text-[#563212] hover:bg-gray-100'
+                        : 'bg-[#5C9850] text-white hover:bg-[#4a7a3f]'
+                    }`}
+                  >
+                    Role Detail
+                  </button>
+                </div>
+
+                {/* Detail Content */}
+                <div
+                  className={`w-full h-full  ${
+                    openDetailId === role.id
+                      ? 'opacity-100 visible'
+                      : 'opacity-0 invisible absolute'
+                  }`}
+                >
+                  <div
+                    className={`h-full w-full flex flex-col justify-between p-4 sm:p-6 ${
+                      selectedRole === role.id ? 'bg-[#5C9850]' : 'bg-white'
+                    }`}
+                  >
+                    <div className="flex-1">
+                      <h2
+                        className={`text-center font-bold lg:text-[36px] md:text-[28px] text-[22px] font-roboto mt-4 sm:mt-6 ${
+                          selectedRole === role.id ? 'text-white' : 'text-[#33552C]'
+                        }`}
+                      >
+                        {role.title}
+                      </h2>
+                      <div className="mt-3 sm:mt-4 space-y-2">
+                        {role.description.map((desc, index) => (
+                          <div key={index} className="flex gap-2 px-2 sm:px-3 items-start">
+                            <div
+                              className={`min-w-1.5 min-h-1.5 sm:min-w-2 sm:min-h-2 rounded-full mt-2 shrink-0 ${
+                                selectedRole === role.id ? 'bg-white' : 'bg-[#33552C]'
+                              }`}
+                            ></div>
+                            <p
+                              className={`text-[13px] sm:text-[15px] md:text-[16px] font-roboto leading-[1.4] sm:leading-[25px] ${
+                                selectedRole === role.id ? 'text-white' : 'text-[#33552C]'
+                              }`}
+                            >
+                              {desc}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex justify-center mt-4 sm:mt-6">
+                      <button
+                        onClick={() => toggleDetail(role.id)}
+                        className={`px-8 sm:px-16 py-2 text-[16px] sm:text-[20px] font-roboto transition-colors duration-200 ${
+                          selectedRole === role.id
+                            ? 'bg-white text-[#563212] hover:bg-gray-100'
+                            : 'bg-[#5C9850] text-white hover:bg-[#4a7a3f]'
+                        }`}
+                      >
+                        Back
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="mb-3 px-4">
+          <div>
+            <div className="flex justify-center pb-3">
+              <button
+                onClick={handleContinue}
+                disabled={!canContinue}
+                title={
+                  !selectedRole
+                    ? 'Select a role to continue'
+                    : lobbyState?.status !== 'ready'
+                    ? "All players didn't select the roles yet"
+                    : userInfo?._id !== leader
+                    ? 'Only the lobby leader can continue'
+                    : 'Continue to pairing'
+                }
+                className={`flex justify-center items-center gap-10 px-3 py-2 rounded-[5px] transition-colors duration-150 ${
+                  canContinue
+                    ? 'bg-[#E1E1E1] hover:brightness-95 cursor-pointer'
+                    : 'bg-gray-200 opacity-60 cursor-not-allowed'
+                }`}
+                style={{ boxShadow: '0 3px 7px rgba(0, 0, 0, 0.4)' }}
+              >
+                <p
+                  className={`font-bold md:text-[27px] text-[24px] font-roboto ${
+                    canContinue ? 'text-[#6D924B]' : 'text-gray-600'
+                  }`}
+                >
+                  Continue
+                </p>
+                <div
+                  className={`w-[38px] h-[38px] flex justify-center items-center rounded-[50%] ${
+                    canContinue ? 'bg-[#C0D066]' : 'bg-gray-300'
+                  }`}
+                >
+                  <Image src={sideArrow} alt="sideArrow" />
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {error && (
+          <div className="px-4 mb-4">
+            <div className="bg-red-100 text-red-700 p-3 rounded-lg text-center">{error}</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
