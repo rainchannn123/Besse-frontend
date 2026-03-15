@@ -2,6 +2,14 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
+
+
+//"build": "next build && cp -r .next/static .next/standalone/.next/static && cp -r public .next/standalone/public",
+
+
+
+
+
 First, run the development server:
 
 
