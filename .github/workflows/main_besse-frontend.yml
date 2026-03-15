@@ -54,5 +54,5 @@ jobs:
         with:
           app-name: 'besse-frontend'
           slot-name: 'Production'
-          package: .
+          package: ./.next/standalone
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_ABCF00A0AA3443A6B1652E00708AF370 }}
