@@ -35,9 +35,7 @@ jobs:
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
-          name: next-standalone
-          path: .next/standalone/
-          retention-days: 1
+          name: node-app
 
   deploy:
     runs-on: ubuntu-latest
@@ -47,8 +45,7 @@ jobs:
       - name: Download artifact from build job
         uses: actions/download-artifact@v4
         with:
-          name: next-standalone
-          path: .next/standalone  # restores to this folder
+          name: node-app
       
       - name: 'Deploy to Azure Web App'
         id: deploy-to-webapp
@@ -56,5 +53,5 @@ jobs:
         with:
           app-name: 'besse-frontend'
           slot-name: 'Production'
-          package: .next/standalone
+          package: .
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_ABCF00A0AA3443A6B1652E00708AF370 }}
