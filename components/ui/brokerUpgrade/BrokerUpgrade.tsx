@@ -59,7 +59,7 @@ export const BrokerUpgrade: React.FC = () => {
                     <div
                       key={index}
                       className={`h-10 w-[17px] rounded-[25px] ${
-                        index < feature.level ? "bg-[#6D974D]" : "bg-gray-200"
+                        index < feature.level ? "bg-[#50704C]" : "bg-gray-200"
                       }`}
                     ></div>
                   ))}
@@ -96,7 +96,7 @@ export const BrokerUpgrade: React.FC = () => {
         </div>
       </div>
 
-      <button className="w-full bg-[#6D974D]  hover:bg-[#6D974D] flex justify-around rounded-[5px] mt-6">
+      <button className="w-full bg-[#50704C]  hover:bg-[#50704C] flex justify-around rounded-[5px] mt-6">
         <p></p>
         <p className="text-white py-2 rounded-[5px] font-bold text-[24px]">
           Upgrade

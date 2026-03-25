@@ -167,7 +167,7 @@ export default function JoinGroupPage() {
                 <button
                   onClick={handleJoinCity}
                   disabled={loading}
-                  className={`w-full font-roboto flex-1 py-4 border-2 border-[#000000] bg-[#6D974D] lg:text-[30px] md:text-[30px] text-[20px] font-bold text-white shadow-lg transition duration-300 hover:shadow-xl disabled:opacity-70 disabled:cursor-not-allowed ${
+                  className={`w-full font-roboto flex-1 py-4 border-2 border-[#000000] bg-[#50704C] lg:text-[30px] md:text-[30px] text-[20px] font-bold text-white shadow-lg transition duration-300 hover:shadow-xl disabled:opacity-70 disabled:cursor-not-allowed ${
                     loading ? 'opacity-70' : ''
                   }`}
                 >

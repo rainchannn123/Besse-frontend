@@ -35,7 +35,7 @@ const DynamicDropdown: React.FC<DynamicDropdownProps> = ({
           onClick={() => !disabled && setIsOpen(!isOpen)}
           disabled={disabled}
           className={`px-4 py-2 text-white rounded-[10px] font-roboto flex items-center justify-between min-w-[140px] ${
-            disabled ? 'bg-[#8b6647] cursor-not-allowed' : 'bg-[#6D974D] cursor-pointer'
+            disabled ? 'bg-[#8b6647] cursor-not-allowed' : 'bg-[#50704C] cursor-pointer'
           }`}
         >
           <span className="text-[20px]">{selectedValue}</span>

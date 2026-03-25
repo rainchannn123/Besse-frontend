@@ -4,6 +4,7 @@ import { Footer } from '@/components/layout/footer/Footer';
 import { MunicipalityFooter } from '@/components/layout/footer/MunicipalityFooter';
 import { Header } from '@/components/layout/header/Header';
 import { MunicipalityHeader } from '@/components/layout/header/MunicipalityHeader';
+import { UserLogoutButton } from '@/components/layout/header/UserLogoutButton';
 import { NotificationCenter } from '@/components/ui/notifications/NotificationCenter';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { gameService } from '@/services/gameService';
@@ -105,6 +106,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const unsubSystemCheckUpdate = subscribe('system-check-update', (payload: any) => {
       if (payload?.gameState) {
         setGameState(payload.gameState);
+
+        if (
+          payload.gameState.gameStatus === 'complete' ||
+          payload.gameState.gameStatus === 'lost' ||
+          payload.gameState.gameStatus === 'won'
+        ) {
+          router.push('/dashboard/game-over');
+        }
       }
     });
 
@@ -146,7 +155,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       : null;
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-gray-50 flex flex-col relative">
+      <UserLogoutButton />
       {isMunicipalityPage && gameState ? (
         <MunicipalityHeader
           playerName={user?.name}
@@ -159,6 +169,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <Header />
       )}
       <main className="flex-1 bgColor">{children}</main>
+
       <NotificationCenter
         notifications={notifications}
         onDismiss={removeNotification}

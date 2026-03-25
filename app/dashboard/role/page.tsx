@@ -9,25 +9,71 @@ import woodenHeading from '@/public/assets/images/woodenHeading.png';
 import { authService } from '@/services/authService';
 import { lobbyService } from '@/services/lobbyService';
 import { useAuthStore } from '@/stores/authStore';
-import { useUserStore } from '@/stores/userStore';
 import { PlayerRole } from '@/types/besse';
+import { getLobbyRoute } from '@/utils/lobbyStage';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export default function RolePage() {
   const [selectedRole, setSelectedRole] = useState<number | null>(null);
   const [openDetailId, setOpenDetailId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
+  const [isLeaving, setIsLeaving] = useState(false);
   const [lobbyState, setLobbyState] = useState<any>(null);
   const [leader, setLeader] = useState<string>('');
   const [userInfo, setUserInfo] = useState<any>(null);
 
-  const { user } = useAuthStore();
-  const { pairingStatus } = useUserStore();
-  const { subscribe, isConnected, joinGame } = useWebSocket();
+  const { user, updateUser } = useAuthStore();
+  const { subscribe, isConnected, joinGame, leaveGame } = useWebSocket();
   const router = useRouter();
+  const isFetchingLobbyRef = useRef(false);
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const applyLobbyState = useCallback((nextLobbyState: any, currentUserId?: string) => {
+    setLobbyState(nextLobbyState);
+    setLeader(nextLobbyState.leader);
+    setError('');
+
+    const roleToId: Record<string, number> = {
+      municipality: 1,
+      mrf: 2,
+      broker: 3,
+    };
+
+    const currentPlayer = nextLobbyState.players.find(
+      (player: any) => player.userId === currentUserId
+    );
+
+    if (currentPlayer?.selectedRole && roleToId[currentPlayer.selectedRole]) {
+      setSelectedRole(roleToId[currentPlayer.selectedRole]);
+    } else {
+      setSelectedRole(null);
+    }
+  }, []);
+
+  const clearLobbyClientState = useCallback(
+    (nextUser?: typeof user) => {
+      if (user?.currentSession) {
+        leaveGame(user.currentSession);
+      }
+
+      localStorage.removeItem('pairing_session_id');
+      localStorage.removeItem('current_game_session');
+      localStorage.removeItem('init_state');
+
+      if (nextUser) {
+        updateUser(nextUser);
+      } else if (user) {
+        updateUser({
+          ...user,
+          currentSession: null,
+        });
+      }
+    },
+    [leaveGame, updateUser, user]
+  );
 
   const getRolesWithPlayerNames = () => {
     const baseRoles = [
@@ -79,77 +125,86 @@ export default function RolePage() {
     });
   };
 
-  useEffect(() => {
-    const fetchLobbyState = async () => {
+  const fetchLobbyState = useCallback(async (showLoader = false) => {
+    if (isFetchingLobbyRef.current) return;
+    isFetchingLobbyRef.current = true;
+
+    if (showLoader) {
+      setLoading(true);
+    }
+
+    try {
       const profileResponse = await authService.getProfile();
       if (!profileResponse.success || !profileResponse.data) {
         throw new Error('Failed to get profile');
       }
+
       const userData = profileResponse.data.user;
       setUserInfo(userData);
-      if (!userData?.currentSession) return;
+      updateUser(userData);
 
-      try {
-        const response = await lobbyService.getLobbyState(userData.currentSession);
-        if (response.data?.lobbyState) {
-          setLobbyState(response.data.lobbyState);
-          setLeader(response.data.lobbyState.leader);
-
-          // Set selected role based on user's current role
-          const currentPlayer = response.data.lobbyState.players.find(
-            (player: any) => player.userId === (user as any)._id
-          );
-          if (currentPlayer?.selectedRole) {
-            const roleData = getRolesWithPlayerNames().find(
-              (role) => role.role === currentPlayer.selectedRole
-            );
-            if (roleData) {
-              setSelectedRole(roleData.id);
-            }
-          }
-        }
-      } catch (err: any) {
-        console.error('Failed to fetch lobby state:', err);
-        setError('Failed to load lobby state');
+      if (!userData?.currentSession) {
+        clearLobbyClientState(userData);
+        router.replace('/dashboard/besse-group');
+        return;
       }
-    };
 
-    fetchLobbyState();
-  }, [userInfo?.currentSession, userInfo?._id]);
-
-  const fetchLobbyState = async () => {
-    const profileResponse = await authService.getProfile();
-    if (!profileResponse.success || !profileResponse.data) {
-      throw new Error('Failed to get profile');
-    }
-    const userData = profileResponse.data.user;
-    setUserInfo(userData);
-    if (!userData?.currentSession) return;
-
-    try {
       const response = await lobbyService.getLobbyState(userData.currentSession);
       if (response.data?.lobbyState) {
-        setLobbyState(response.data.lobbyState);
-        setLeader(response.data.lobbyState.leader);
-
-        // Set selected role based on user's current role
-        const currentPlayer = response.data.lobbyState.players.find(
-          (player: any) => player.userId === (user as any)._id
+        const nextLobbyState = response.data.lobbyState;
+        const currentPlayer = nextLobbyState.players.find(
+          (player: any) => player.userId === userData._id
         );
-        if (currentPlayer?.selectedRole) {
-          const roleData = getRolesWithPlayerNames().find(
-            (role) => role.role === currentPlayer.selectedRole
-          );
-          if (roleData) {
-            setSelectedRole(roleData.id);
-          }
+
+        if (!currentPlayer) {
+          clearLobbyClientState({
+            ...userData,
+            currentSession: null,
+          });
+          router.replace('/dashboard/besse-group');
+          return;
         }
+
+        const nextRoute = getLobbyRoute(nextLobbyState, userData._id);
+        if (nextRoute !== '/dashboard/role') {
+          router.replace(nextRoute);
+          return;
+        }
+
+        applyLobbyState(nextLobbyState, userData._id);
       }
     } catch (err: any) {
       console.error('Failed to fetch lobby state:', err);
-      setError('Failed to load lobby state');
+      setError(err.response?.data?.message || 'Failed to load lobby state');
+    } finally {
+      if (showLoader) {
+        setLoading(false);
+      }
+      isFetchingLobbyRef.current = false;
     }
-  };
+  }, [applyLobbyState, clearLobbyClientState, router, updateUser]);
+
+  const scheduleLobbyRefresh = useCallback(() => {
+    if (refreshTimerRef.current) {
+      clearTimeout(refreshTimerRef.current);
+    }
+
+    refreshTimerRef.current = setTimeout(() => {
+      void fetchLobbyState(false);
+    }, 200);
+  }, [fetchLobbyState]);
+
+  useEffect(() => {
+    void fetchLobbyState(true);
+  }, [fetchLobbyState, user?.currentSession]);
+
+  useEffect(() => {
+    return () => {
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current);
+      }
+    };
+  }, []);
 
   // Helper function to extract players from the game state
   const extractPlayers = (data: any): Array<{ userId: string; selectedRole: string }> => {
@@ -184,10 +239,79 @@ export default function RolePage() {
 
   // Subscribe to lobby state updates via WebSocket
   useEffect(() => {
+    if (!userInfo?.currentSession) return;
+
+    const isCurrentSessionEvent = (data: any) => {
+      const payloadSessionId = data?.sessionId || data?.lobby?.sessionId;
+      return !payloadSessionId || payloadSessionId === userInfo.currentSession;
+    };
+
     const unsubscribe = subscribe('lobby-state-update', (data: any) => {
-      if (data.sessionId === userInfo?.currentSession) {
-        fetchLobbyState();
+      if (isCurrentSessionEvent(data)) {
+        scheduleLobbyRefresh();
       }
+    });
+
+    const unsubscribeSystemMessage = subscribe('system-message', () => {
+      scheduleLobbyRefresh();
+    });
+
+    const unsubscribePlayerAction = subscribe('player-action', () => {
+      scheduleLobbyRefresh();
+    });
+
+    const unsubscribeRoleSelected = subscribe('role-selected', () => {
+      scheduleLobbyRefresh();
+    });
+
+    const unsubscribeRoleDeselected = subscribe('role-deselected', () => {
+      scheduleLobbyRefresh();
+    });
+
+    const unsubscribePlayerJoined = subscribe('player-joined', () => {
+      scheduleLobbyRefresh();
+    });
+
+    const unsubscribePlayerLeft = subscribe('player-left', () => {
+      scheduleLobbyRefresh();
+    });
+
+    const unsubscribePlayerLeftOptimistic = subscribe('player-left', (data: any) => {
+      if (!isCurrentSessionEvent(data)) {
+        return;
+      }
+
+      const leftUserId = data?.userId || data?.playerId || data?.leftUserId || data?.player?._id;
+
+      if (data?.lobbyState) {
+        applyLobbyState(data.lobbyState, userInfo._id);
+      } else if (leftUserId) {
+        setLobbyState((prevState: any) => {
+          if (!prevState?.players) {
+            return prevState;
+          }
+
+          return {
+            ...prevState,
+            leader: data?.leader || prevState.leader,
+            status: data?.status || prevState.status,
+            players: prevState.players.filter(
+              (player: any) => String(player.userId) !== String(leftUserId)
+            ),
+          };
+        });
+      }
+
+      if (String(leftUserId) === String(userInfo._id)) {
+        clearLobbyClientState({
+          ...userInfo,
+          currentSession: null,
+        });
+        router.replace('/dashboard/besse-group');
+        return;
+      }
+
+      scheduleLobbyRefresh();
     });
 
     const unSubcribeGameStarted = subscribe('game-started', (data: any) => {
@@ -210,6 +334,7 @@ export default function RolePage() {
 
     const unsubLobbyActivated = subscribe('lobby-activated', (data: any) => {
       console.log('Lobby activated event received: in role page', data);
+      scheduleLobbyRefresh();
 
       if (data?.lobby?.status === 'active') {
         // For lobby-activated event, the structure might be different
@@ -245,14 +370,19 @@ export default function RolePage() {
       }
     });
 
-    console.log(unSubcribeGameStarted)
-
     return () => {
       unsubscribe && unsubscribe();
+      unsubscribeSystemMessage && unsubscribeSystemMessage();
+      unsubscribePlayerAction && unsubscribePlayerAction();
+      unsubscribeRoleSelected && unsubscribeRoleSelected();
+      unsubscribeRoleDeselected && unsubscribeRoleDeselected();
+      unsubscribePlayerJoined && unsubscribePlayerJoined();
+      unsubscribePlayerLeft && unsubscribePlayerLeft();
+      unsubscribePlayerLeftOptimistic && unsubscribePlayerLeftOptimistic();
       unsubLobbyActivated && unsubLobbyActivated();
       unSubcribeGameStarted && unSubcribeGameStarted();
     };
-  }, [subscribe, userInfo?.currentSession, userInfo?._id]);
+  }, [applyLobbyState, clearLobbyClientState, router, scheduleLobbyRefresh, subscribe, userInfo]);
 
   // Ensure we're connected to the game room to receive game-started events
   useEffect(() => {
@@ -305,26 +435,7 @@ export default function RolePage() {
       }
 
       // Refresh lobby state after role change
-      const response = await lobbyService.getLobbyState(userInfo.currentSession);
-      if (response.data?.lobbyState) {
-        setLobbyState(response.data.lobbyState);
-        setLeader(response.data.lobbyState.leader);
-
-        // Update selected role based on new lobby state
-        const updatedPlayer = response.data.lobbyState.players.find(
-          (player: any) => player.userId === userInfo._id
-        );
-        if (updatedPlayer?.selectedRole) {
-          const roleData = roles.find((role) => role.role === updatedPlayer.selectedRole);
-          if (roleData) {
-            setSelectedRole(roleData.id);
-          } else {
-            setSelectedRole(null);
-          }
-        } else {
-          setSelectedRole(null);
-        }
-      }
+      await fetchLobbyState(false);
     } catch (err: any) {
       console.error('Role selection error:', err);
       setError(err.response?.data?.message || 'Failed to select role. Please try again.');
@@ -344,10 +455,57 @@ export default function RolePage() {
       return;
     }
 
-    // Navigate to pairing page
-    localStorage.setItem('pairing_session_id', userInfo.currentSession);
-    router.push(`/dashboard/pairing?sessionId=${userInfo.currentSession}`);
+    if (!userInfo?.currentSession) {
+      setError('Session not found. Please refresh and try again.');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      await lobbyService.continueToPairing({
+        sessionId: userInfo.currentSession,
+      });
+
+      localStorage.setItem('pairing_session_id', userInfo.currentSession);
+      router.push(`/dashboard/pairing?sessionId=${userInfo.currentSession}`);
+    } catch (err: any) {
+      console.error('Continue to pairing error:', err);
+      setError(err.response?.data?.message || 'Failed to continue to pairing. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const handleLeaveLobby = useCallback(async () => {
+    if (!userInfo?.currentSession || isLeaving) {
+      return;
+    }
+
+    setIsLeaving(true);
+    setError('');
+
+    try {
+      await lobbyService.leaveLobby({ sessionId: userInfo.currentSession });
+      clearLobbyClientState({
+        ...(userInfo || user),
+        currentSession: null,
+      });
+
+      const profileResponse = await authService.getProfile();
+      if (profileResponse.success && profileResponse.data?.user) {
+        updateUser(profileResponse.data.user);
+      }
+
+      router.push('/dashboard/besse-group');
+    } catch (err: any) {
+      console.error('Leave lobby error:', err);
+      setError(err.response?.data?.message || 'Failed to leave lobby');
+    } finally {
+      setIsLeaving(false);
+    }
+  }, [clearLobbyClientState, isLeaving, router, updateUser, user, userInfo]);
 
   // Allow leader to continue when all roles are selected (lobby is ready)
   const canContinue = Boolean(
@@ -490,10 +648,18 @@ export default function RolePage() {
 
         <div className="mb-3 px-4">
           <div>
-            <div className="flex justify-center pb-3">
+            <div className="flex flex-wrap justify-center gap-4 pb-3">
+              <button
+                onClick={handleLeaveLobby}
+                disabled={isLeaving || loading}
+                className="px-6 py-3 rounded-[5px] bg-[#9C4F40] text-white font-bold md:text-[24px] text-[20px] font-roboto disabled:opacity-60 disabled:cursor-not-allowed"
+                style={{ boxShadow: '0 3px 7px rgba(0, 0, 0, 0.4)' }}
+              >
+                {isLeaving ? 'Quitting...' : 'Quit Lobby'}
+              </button>
               <button
                 onClick={handleContinue}
-                disabled={!canContinue}
+                disabled={!canContinue || isLeaving}
                 title={
                   !selectedRole
                     ? 'Select a role to continue'

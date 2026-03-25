@@ -24,11 +24,9 @@ export default function page() {
   const [loading, setLoading] = useState(true);
   const [gameCompleteResults, setGameCompleteResults] = useState<any>(null);
   const [pairDetails, setPairDetails] = useState<any>(null);
-  const [lobbyState, setLobbyState] = useState<any>(null);
-  const [isOwner, setIsOwner] = useState(false);
 
   // Use WebSocket for real-time updates
-  const { subscribe, joinGame } = useGameWebSocket(user?.currentSession || undefined);
+  const { subscribe, joinGame, leaveGame } = useGameWebSocket(user?.currentSession || undefined);
 
   const fetchGameState = async () => {
     if (!user?.currentSession) {
@@ -76,26 +74,8 @@ export default function page() {
     }
   };
 
-  const fetchLobbyState = async (sessionId: string) => {
-    try {
-      const response = await lobbyService.getLobbyState(sessionId);
-      if (response.success && response.data) {
-        setLobbyState(response.data.lobbyState);
-        setIsOwner(response.data.lobbyState.leader === user?._id);
-      }
-    } catch (err: any) {
-      console.error('Failed to fetch lobby state:', err);
-    }
-  };
-
   useEffect(() => {
     fetchGameState();
-  }, [user?.currentSession]);
-
-  useEffect(() => {
-    if (user?.currentSession) {
-      fetchLobbyState(user.currentSession);
-    }
   }, [user?.currentSession]);
 
   // Join game session for real-time updates
@@ -134,29 +114,37 @@ export default function page() {
   };
 
   const handleStartNewGame = async () => {
-    if (!user?.currentSession) return;
+    if (!user) return;
+
+    const activeSessionId = user.currentSession;
+
     try {
-      const response = await lobbyService.startNewGame(user.currentSession);
-      if (response.success) {
-        // Clear game-related local storage
-        secureStorage.removeItem('pairing_session_id');
-        secureStorage.removeItem('current_game_session');
-        secureStorage.removeItem('init_state');
-
-        // Update user's current session to new session
-        const updatedUser = { ...user, currentSession: response.data.lobby.sessionId };
-        updateUser(updatedUser);
-
-        router.push('/dashboard/team-members');
-      } else {
-        console.error({
-          message: response.message || 'Failed to start new game',
-          type: 'error',
-        });
+      // Exit only this player from the finished lobby so each player can decide independently.
+      if (activeSessionId) {
+        await lobbyService.leaveLobby({ sessionId: activeSessionId });
+        leaveGame(activeSessionId);
       }
+
+      secureStorage.removeItem('pairing_session_id');
+      secureStorage.removeItem('current_game_session');
+      secureStorage.removeItem('init_state');
+
+      updateUser({
+        ...user,
+        currentSession: null,
+      });
+
+      addNotification({
+        message: 'You have exited the previous game. Create or join your next game.',
+        type: 'success',
+      });
+
+      // Route to create/join game page
+      router.push('/dashboard/besse-group');
     } catch (err: any) {
-      console.error({
-        message: err.message || 'Failed to start new game',
+      console.error('Failed to exit current game session:', err);
+      addNotification({
+        message: err.response?.data?.message || 'Failed to exit current game. Please try again.',
         type: 'error',
       });
     }
@@ -451,32 +439,19 @@ export default function page() {
             </div>
 
             <div className="flex justify-center pb-3 pt-6">
-              {isOwner ? (
-                <div className="flex gap-4">
-                  <button
-                    onClick={handleStartNewGame}
-                    className="flex justify-center items-center gap-10 bg-[#FFFFFF] px-3 py-2 rounded-[5px]"
-                    style={{ boxShadow: '0 3px 7px #AD8E53' }}
-                  >
-                    <p className="text-[#6D924B] font-bold text-[27px] font-roboto">
-                      Start New Game
-                    </p>
-                    <div className="bg-[#C0D066] w-[38px] h-[38px] flex justify-center items-center rounded-[50%]">
-                      <Image src={sideArrow} alt="sideArrow" />
-                    </div>
-                  </button>
-                  <button
-                    onClick={handleLogout}
-                    className="flex justify-center items-center gap-10 bg-[#FFFFFF] px-3 py-2 rounded-[5px]"
-                    style={{ boxShadow: '0 3px 7px #AD8E53' }}
-                  >
-                    <p className="text-[#6D924B] font-bold text-[27px] font-roboto">Log out</p>
-                    <div className="bg-[#C0D066] w-[38px] h-[38px] flex justify-center items-center rounded-[50%]">
-                      <Image src={sideArrow} alt="sideArrow" />
-                    </div>
-                  </button>
-                </div>
-              ) : (
+              <div className="flex gap-4">
+                <button
+                  onClick={handleStartNewGame}
+                  className="flex justify-center items-center gap-10 bg-[#FFFFFF] px-3 py-2 rounded-[5px]"
+                  style={{ boxShadow: '0 3px 7px #AD8E53' }}
+                >
+                  <p className="text-[#6D924B] font-bold text-[27px] font-roboto">
+                    Start New Game
+                  </p>
+                  <div className="bg-[#C0D066] w-[38px] h-[38px] flex justify-center items-center rounded-[50%]">
+                    <Image src={sideArrow} alt="sideArrow" />
+                  </div>
+                </button>
                 <button
                   onClick={handleLogout}
                   className="flex justify-center items-center gap-10 bg-[#FFFFFF] px-3 py-2 rounded-[5px]"
@@ -487,7 +462,7 @@ export default function page() {
                     <Image src={sideArrow} alt="sideArrow" />
                   </div>
                 </button>
-              )}
+              </div>
             </div>
           </div>
         </main>

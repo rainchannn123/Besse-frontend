@@ -104,7 +104,7 @@ export const MRFCollect: React.FC<MRFCollectProps> = ({
 
         <button
           onClick={handleProcessWaste}
-          className="w-full bg-[#6D974D] hover:bg-[#5a8a42] flex justify-around rounded-[5px] disabled:opacity-50"
+          className="w-full bg-[#50704C] hover:bg-[#5a8a42] flex justify-around rounded-[5px] disabled:opacity-50"
           disabled={!selectedItem || selectedItem.processed || !actionSelected}
         >
           <p></p>

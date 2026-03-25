@@ -53,7 +53,7 @@ export const CityProjectAction: React.FC<CityProjectActionProps> = ({
             </p>
             <div className="w-full bg-gray-200 rounded-full h-4">
               <div
-                className="bg-[#6D974D] h-4 rounded-full transition-all"
+                className="bg-[#50704C] h-4 rounded-full transition-all"
                 style={{ width: `${selectedProject.progress}%` }}
               ></div>
             </div>
@@ -104,12 +104,25 @@ export const CityProjectAction: React.FC<CityProjectActionProps> = ({
                 +{selectedProject.healthBonus}%
               </p>
             </div>
+
+            {/* Budget Bonus */}
+            <div className="flex justify-between items-center">
+              <div className="flex gap-2 items-center">
+                <Image src={dollarBag} alt="budget" className="w-6 h-6" />
+                <p className="2xl:text-[20px] xl:text-[17px]  lg:text-[20px] md:text-[20px] text-[20px] font-bold text-black font-roboto">
+                  Budget Bonus
+                </p>
+              </div>
+              <p className="2xl:text-[20px] xl:text-[17px]  lg:text-[20px] md:text-[20px] text-[20px]  font-normal text-black font-roboto">
+                +${(selectedProject.budgetBonus ?? 0).toFixed(0)}
+              </p>
+            </div>
           </div>
 
           <button
             onClick={handleConstructProject}
             disabled={!canConstruct || selectedProject.completed}
-            className="w-full bg-[#6D974D] hover:bg-[#5a8a42] flex justify-around rounded-[5px] disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-[#50704C] hover:bg-[#5a8a42] flex justify-around rounded-[5px] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <p></p>
             <p className="text-white py-2 rounded-[5px] font-bold 2xl:text-[24px] xl:text-[16px] lg:text-[24px] text-[24px]">

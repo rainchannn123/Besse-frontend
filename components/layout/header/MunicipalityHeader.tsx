@@ -30,7 +30,7 @@ export const MunicipalityHeader: React.FC<MunicipalityHeaderProps> = ({
     router.push('/auth/login');
   };
   return (
-    <div className="bg-[#6D974D] py-3 sm:py-4">
+    <div className="bg-[#50704C] py-3 sm:py-4">
       <div className="container mx-auto px-3 sm:px-4 md:px-0">
         {/* Mobile & Tablet Layout */}
         <div className="lg:hidden space-y-3">

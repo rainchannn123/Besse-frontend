@@ -13,7 +13,7 @@ import note from "@/public/assets/images/note.png";
 
 export const MRFooter: React.FC = () => {
   return (
-    <div className="bg-[#6D974D]  lg:pt-2 pt-12  pb-3 flex items-center relative">
+    <div className="bg-[#50704C]  lg:pt-2 pt-12  pb-3 flex items-center relative">
       <div className="container mx-auto">
         <div>
           <h1 className="text-center font-roboto text-[24px] text-white font-bold pb-3 pt-1">

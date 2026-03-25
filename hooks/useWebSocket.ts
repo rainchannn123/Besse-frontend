@@ -476,6 +476,7 @@ export const useGameWebSocket = (
     removeNotification,
     addNotification,
     joinGame,
+    leaveGame,
     currentGameSession: getCurrentGameSession(),
   };
 };

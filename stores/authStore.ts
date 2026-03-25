@@ -82,7 +82,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       const response = await api.post<ApiAuthResponse>('/auth/register', credentials);
       const { user, token } = response.data.data;
 
-      set({ isLoading: false });
+      // set({ isLoading: false });
       return Promise.resolve();
     } catch (error: any) {
       set({ isLoading: false });

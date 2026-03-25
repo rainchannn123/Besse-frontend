@@ -5,7 +5,7 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 
 //"build": "next build && cp -r .next/static .next/standalone/.next/static && cp -r public .next/standalone/public",
-
+    "start": "next start -p $PORT",
 
 
 

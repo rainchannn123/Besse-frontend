@@ -13,6 +13,7 @@ import { PairingWaitingRoom } from '../../../components/ui/pairing/PairingWaitin
 import { usePairingSystem } from '../../../hooks/usePairingSystem';
 import { useWebSocket } from '../../../hooks/useWebSocket';
 import { gameService } from '../../../services/gameService';
+import { lobbyService } from '../../../services/lobbyService';
 import { useUserStore } from '../../../stores/userStore';
 import styles from './page.module.css';
 
@@ -37,6 +38,7 @@ export default function PairingPage({ searchParams }: PairingPageProps) {
   const [isStartingGame, setIsStartingGame] = useState(false);
   const [dismissedNotifications, setDismissedNotifications] = useState<Set<number>>(new Set());
   const [autoStartCountdown, setAutoStartCountdown] = useState<number | null>(null);
+  const [isLeader, setIsLeader] = useState(false);
 
   const {
     pairingStatus,
@@ -48,6 +50,34 @@ export default function PairingPage({ searchParams }: PairingPageProps) {
     getPairingResult,
   } = usePairingSystem(sessionId!, true);
   console.log(sessionId);
+
+  useEffect(() => {
+    const checkLeader = async () => {
+      if (!sessionId || !user?._id) {
+        setIsLeader(false);
+        return;
+      }
+
+      try {
+        const response = await lobbyService.getLobbyState(sessionId);
+        const leaderId = response.data?.lobbyState?.leader;
+        setIsLeader(leaderId === user._id);
+      } catch (error) {
+        console.error('Failed to verify lobby leader:', error);
+        setIsLeader(false);
+      }
+    };
+
+    void checkLeader();
+  }, [sessionId, user?._id]);
+
+  const handleJoinQueueAsLeaderOnly = useCallback(async () => {
+    if (!isLeader) {
+      return false;
+    }
+
+    return joinPairingQueue();
+  }, [isLeader, joinPairingQueue]);
 
   useEffect(() => {
     // If not paired and sessionId exists, check for existing pairing result
@@ -161,8 +191,8 @@ export default function PairingPage({ searchParams }: PairingPageProps) {
         const { secureStorage } = await import('@/utils/secureStorage');
         secureStorage.setItem('init_state', JSON.stringify(gameState));
         localStorage.setItem('current_game_session', sessionId);
-        // Determine user role
-        const userId = currentUser?._id;
+        // Determine user role — prefer currentUser but fall back to authStore user
+        const userId = currentUser?._id || user?._id;
         let userRole: string | null = null;
         if (userId && gameState.players) {
           for (const [role, playerId] of Object.entries(gameState.players)) {
@@ -233,7 +263,12 @@ export default function PairingPage({ searchParams }: PairingPageProps) {
           {/* Pairing States */}
           <div className={styles.page}>
             {!pairingStatus?.isInQueue && !pairingStatus?.isPaired ? (
-              <PairingQueue onJoinQueue={joinPairingQueue} isLoading={isLoading} />
+              <PairingQueue
+                onJoinQueue={handleJoinQueueAsLeaderOnly}
+                isLoading={isLoading}
+                canJoinQueue={isLeader}
+                disabledReason="Only the group leader can start queueing."
+              />
             ) : pairingStatus?.isInQueue && !pairingStatus?.isPaired ? (
               <PairingWaitingRoom
                 position={pairingStatus.position}

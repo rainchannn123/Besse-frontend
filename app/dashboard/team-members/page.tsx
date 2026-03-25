@@ -8,9 +8,10 @@ import woodenHeading from '@/public/assets/images/woodenHeading.png';
 import { authService } from '@/services/authService';
 import { lobbyService } from '@/services/lobbyService';
 import { useAuthStore } from '@/stores/authStore';
+import { getLobbyRoute } from '@/utils/lobbyStage';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 type Member = {
   id: string | number;
@@ -19,68 +20,129 @@ type Member = {
   placeholder?: boolean;
 };
 
+const buildMembersWithPlaceholders = (
+  currentMembers: Member[],
+  totalSeats: number
+): Member[] => {
+  const occupiedMembers = currentMembers.filter((member) => !member.placeholder);
+  const nextMembers = [...occupiedMembers];
+
+  while (nextMembers.length < totalSeats) {
+    nextMembers.push({ id: `placeholder-${nextMembers.length}`, placeholder: true });
+  }
+
+  return nextMembers;
+};
+
 export default function TeamMembersPage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [active, setActive] = useState<string | number | null>(0);
   const [lobbyCode, setLobbyCode] = useState<string>('');
+  const [lobbyState, setLobbyState] = useState<any>(null);
   const [leader, setLeader] = useState<string>('');
   const [maxPlayers, setMaxPlayers] = useState<number>(3);
   const [subtitle, setSubtitle] = useState<string>('3 Players is needed to start playing the game');
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>('');
-  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
-  const { user } = useAuthStore();
+  const [isLeaving, setIsLeaving] = useState(false);
+  const [isContinuing, setIsContinuing] = useState(false);
+  const { user, updateUser } = useAuthStore();
   const router = useRouter();
+  const isFetchingLobbyRef = useRef(false);
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Use WebSocket for real-time updates - joinGame is called automatically by useGameWebSocket
-  const { isConnected, subscribe, joinGame } = useGameWebSocket(user?.currentSession || undefined);
+  const { subscribe, leaveGame } = useGameWebSocket(user?.currentSession || undefined);
 
-  const getLobbyState = async () => {
-    setLoading(true);
-    if (isRefreshing) return; // Prevent multiple simultaneous calls
-    setIsRefreshing(true);
+  const applyLobbyState = useCallback((nextLobbyState: any) => {
+    setLobbyState(nextLobbyState);
+    setLeader(nextLobbyState.leader);
+    setLobbyCode(nextLobbyState.lobbyCode);
+    setMaxPlayers(nextLobbyState.maxPlayers);
+    setSubtitle(`${nextLobbyState.maxPlayers} Players are needed to start playing the game`);
 
-    const profileResponse = await authService.getProfile();
-    if (!profileResponse.success || !profileResponse.data) {
-      throw new Error('Failed to get profile');
-    }
-    const userData = profileResponse.data.user;
-    if (!userData?.currentSession) {
-      setError('No active session found');
-      setLoading(false);
-      setIsRefreshing(false);
-      return;
+    const mappedMembers: Member[] = nextLobbyState.players.map((player: any) => ({
+      id: player.userId,
+      name: player.name,
+      role: player.userId === nextLobbyState.leader ? 'Group Leader' : 'Team Member',
+    }));
+
+    setMembers(buildMembersWithPlaceholders(mappedMembers, nextLobbyState.maxPlayers));
+  }, []);
+
+  const clearLobbyClientState = useCallback(
+    (nextUser?: typeof user) => {
+      if (user?.currentSession) {
+        leaveGame(user.currentSession);
+      }
+
+      localStorage.removeItem('pairing_session_id');
+      localStorage.removeItem('current_game_session');
+      localStorage.removeItem('init_state');
+
+      if (nextUser) {
+        updateUser(nextUser);
+      } else if (user) {
+        updateUser({
+          ...user,
+          currentSession: null,
+        });
+      }
+    },
+    [leaveGame, updateUser, user]
+  );
+
+  const getLobbyState = useCallback(async (showLoader = false) => {
+    if (isFetchingLobbyRef.current) return;
+    isFetchingLobbyRef.current = true;
+
+    if (showLoader) {
+      setLoading(true);
     }
 
     try {
-      setError('');
-      if (!userData.currentSession) {
-        throw new Error('No active session');
+      const profileResponse = await authService.getProfile();
+      if (!profileResponse.success || !profileResponse.data) {
+        throw new Error('Failed to get profile');
       }
-      let response = await lobbyService.getLobbyState(userData.currentSession);
+
+      const userData = profileResponse.data.user;
+      updateUser(userData);
+
+      if (!userData?.currentSession) {
+        setError('');
+        setMembers(buildMembersWithPlaceholders([], maxPlayers));
+        clearLobbyClientState(userData);
+        router.replace('/dashboard/besse-group');
+        return;
+      }
+
+      setError('');
+      const response = await lobbyService.getLobbyState(userData.currentSession);
       console.log('Lobby State Response:', response);
-      if (
-        response.data?.lobbyState.status === 'ready' ||
-        response.data?.lobbyState.status === 'waiting' ||
-        response.data?.lobbyState.status === 'completed'
-      ) {
+
+      if (response.data?.lobbyState) {
         const lobbyState = response.data.lobbyState;
-        setLeader(lobbyState.leader);
-        setLobbyCode(lobbyState.lobbyCode);
-        setMaxPlayers(lobbyState.maxPlayers);
-        setSubtitle(`${lobbyState.maxPlayers} Players are needed to start playing the game`);
+        const currentPlayer = lobbyState.players.find(
+          (player) => player.userId === userData._id
+        );
 
-        const mappedMembers: Member[] = lobbyState.players.map((player, index) => ({
-          id: player.userId,
-          name: player.name,
-          role: player.userId === lobbyState.leader ? 'Group Leader' : 'Team Member',
-        }));
-
-        while (mappedMembers.length < lobbyState.maxPlayers) {
-          mappedMembers.push({ id: mappedMembers.length, placeholder: true });
+        if (!currentPlayer) {
+          clearLobbyClientState({
+            ...userData,
+            currentSession: null,
+          });
+          router.replace('/dashboard/besse-group');
+          return;
         }
 
-        setMembers(mappedMembers);
+        const nextRoute = getLobbyRoute(lobbyState, userData._id);
+        if (nextRoute !== '/dashboard/team-members') {
+          router.replace(nextRoute);
+          return;
+        }
+
+        applyLobbyState(lobbyState);
       } else {
         setError('Lobby not in valid state');
       }
@@ -88,22 +150,34 @@ export default function TeamMembersPage() {
       console.error('Error fetching lobby state:', err);
       setError(err.response?.data?.message || 'Failed to load lobby state');
     } finally {
-      setLoading(false);
-      setIsRefreshing(false);
+      if (showLoader) {
+        setLoading(false);
+      }
+      isFetchingLobbyRef.current = false;
     }
-  };
+  }, [applyLobbyState, clearLobbyClientState, maxPlayers, router, updateUser]);
+
+  const scheduleLobbyRefresh = useCallback(() => {
+    if (refreshTimerRef.current) {
+      clearTimeout(refreshTimerRef.current);
+    }
+
+    refreshTimerRef.current = setTimeout(() => {
+      void getLobbyState(false);
+    }, 200);
+  }, [getLobbyState]);
 
   useEffect(() => {
-    getLobbyState();
-  }, [user?.currentSession]);
+    void getLobbyState(true);
+  }, [getLobbyState, user?.currentSession]);
 
-  // Ensure we're connected to the game room to receive game-started events
   useEffect(() => {
-    if (user?.currentSession && isConnected) {
-      console.log('Team Members page: Joining game room with sessionId:', user.currentSession);
-      joinGame(user.currentSession);
-    }
-  }, [user?.currentSession, isConnected, joinGame]);
+    return () => {
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current);
+      }
+    };
+  }, []);
 
   // Removed polling to reduce auto refreshes, relying on WebSocket updates
   // Helper function to extract players from the game state
@@ -140,12 +214,70 @@ export default function TeamMembersPage() {
   useEffect(() => {
     if (!user?.currentSession) return;
 
+    const unsubscribeLobbyStateUpdate = subscribe('lobby-state-update', (data: any) => {
+      if (!data?.sessionId || data.sessionId === user.currentSession) {
+        scheduleLobbyRefresh();
+      }
+    });
+
     const unsubscribeSystemMessage = subscribe('system-message', () => {
-      getLobbyState();
+      scheduleLobbyRefresh();
     });
 
     const unsubscribePlayerAction = subscribe('player-action', () => {
-      getLobbyState();
+      scheduleLobbyRefresh();
+    });
+
+    const unsubscribeRoleSelected = subscribe('role-selected', () => {
+      scheduleLobbyRefresh();
+    });
+
+    const unsubscribeRoleDeselected = subscribe('role-deselected', () => {
+      scheduleLobbyRefresh();
+    });
+
+    const unsubscribePlayerJoined = subscribe('joined-game', (data:any) => {
+      if (data?.sessionId && data.sessionId !== user.currentSession) {
+        return;
+      }
+      scheduleLobbyRefresh();
+    });
+
+    // const unsubscribePairingJoined = subscribe('pairing-joined', (data: any) => {
+    //   if (data?.sessionId && data.sessionId !== user.currentSession) {
+    //     return;
+    //   }
+    //   scheduleLobbyRefresh();
+    // });
+
+    const unsubscribePlayerLeft = subscribe('player-left', (data: any) => {
+      if (data?.sessionId && data.sessionId !== user.currentSession) {
+        return;
+      }
+
+      const leftUserId = data?.userId || data?.playerId || data?.leftUserId || data?.player?._id;
+
+      if (data?.lobbyState) {
+        applyLobbyState(data.lobbyState);
+      } else if (leftUserId) {
+        setMembers((prevMembers) => {
+          const filteredMembers = prevMembers.filter(
+            (member) => !member.placeholder && String(member.id) !== String(leftUserId)
+          );
+          return buildMembersWithPlaceholders(filteredMembers, maxPlayers);
+        });
+      }
+
+      if (String(leftUserId) === String(user._id)) {
+        clearLobbyClientState({
+          ...user,
+          currentSession: null,
+        });
+        router.replace('/dashboard/besse-group');
+        return;
+      }
+
+      scheduleLobbyRefresh();
     });
 
     const unSubcribeGameStarted = subscribe('game-started', (data: any) => {
@@ -204,12 +336,71 @@ export default function TeamMembersPage() {
     });
 
     return () => {
+      unsubscribeLobbyStateUpdate && unsubscribeLobbyStateUpdate();
       unsubscribePlayerAction && unsubscribePlayerAction();
+      unsubscribeRoleSelected && unsubscribeRoleSelected();
+      unsubscribeRoleDeselected && unsubscribeRoleDeselected();
+      unsubscribePlayerJoined && unsubscribePlayerJoined();
+      unsubscribePlayerLeft && unsubscribePlayerLeft();
       unsubLobbyActivated && unsubLobbyActivated();
       unSubcribeGameStarted && unSubcribeGameStarted();
       unsubscribeSystemMessage && unsubscribeSystemMessage();
     };
-  }, [user?.currentSession, subscribe]);
+  }, [applyLobbyState, clearLobbyClientState, maxPlayers, router, scheduleLobbyRefresh, subscribe, user]);
+
+  const handleLeaveLobby = useCallback(async () => {
+    if (!user?.currentSession || isLeaving) {
+      return;
+    }
+
+    setIsLeaving(true);
+    setError('');
+
+    try {
+      await lobbyService.leaveLobby({ sessionId: user.currentSession });
+      clearLobbyClientState({
+        ...user,
+        currentSession: null,
+      });
+
+      const profileResponse = await authService.getProfile();
+      if (profileResponse.success && profileResponse.data?.user) {
+        updateUser(profileResponse.data.user);
+      }
+
+      router.push('/dashboard/besse-group');
+    } catch (err: any) {
+      console.error('Leave lobby error:', err);
+      setError(err.response?.data?.message || 'Failed to leave lobby');
+    } finally {
+      setIsLeaving(false);
+    }
+  }, [clearLobbyClientState, isLeaving, router, updateUser, user]);
+
+  const joinedPlayersCount = members.filter((member) => !member.placeholder).length;
+  const isLeader = user?._id === leader;
+  const canContinue = isLeader && joinedPlayersCount === maxPlayers && !isLeaving && !isContinuing;
+
+  const handleContinue = useCallback(async () => {
+    if (!user?.currentSession || isContinuing) {
+      return;
+    }
+
+    setIsContinuing(true);
+    setError('');
+
+    try {
+      await lobbyService.continueToRoleSelection({
+        sessionId: user.currentSession,
+      });
+    } catch (err: any) {
+      console.error('Continue to role selection error:', err);
+      setError(err.response?.data?.message || 'Failed to continue to role selection');
+      scheduleLobbyRefresh();
+    } finally {
+      setIsContinuing(false);
+    }
+  }, [isContinuing, scheduleLobbyRefresh, user?.currentSession]);
 
   if (loading) {
     return (
@@ -283,18 +474,46 @@ export default function TeamMembersPage() {
             })}
           </div>
           <div className="my-3">
-            <div className="flex justify-center pb-3">
+            <div className="flex flex-wrap justify-center gap-4 pb-3">
               <button
-                onClick={() => {
-                  router.push('/dashboard/role');
-                }}
-                className={`flex justify-center items-center gap-10 px-3 py-2 rounded-[5px] bg-[#E1E1E1] cursor-pointer`}
+                onClick={handleLeaveLobby}
+                disabled={isLeaving}
+                className="flex justify-center items-center gap-4 px-6 py-2 rounded-[5px] bg-[#9C4F40] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                 style={{ boxShadow: '0 3px 7px rgba(0, 0, 0, 0.4)' }}
               >
-                <p className="text-[#6D924B] font-bold md:text-[27px] text-[24px] font-roboto">
-                  Continue
+                <p className="text-white font-bold md:text-[27px] text-[24px] font-roboto">
+                  {isLeaving ? 'Quitting...' : 'Quit Lobby'}
                 </p>
-                <div className="bg-[#C0D066] w-[38px] h-[38px] flex justify-center items-center rounded-[50%]">
+              </button>
+              <button
+                onClick={handleContinue}
+                disabled={!canContinue}
+                title={
+                  !isLeader
+                    ? 'Only the group leader can continue'
+                    : joinedPlayersCount !== maxPlayers
+                    ? 'Continue is enabled only when all 3 players have joined'
+                    : 'Continue to role selection'
+                }
+                className={`flex justify-center items-center gap-10 px-3 py-2 rounded-[5px] transition-colors duration-150 ${
+                  canContinue
+                    ? 'bg-[#E1E1E1] hover:brightness-95 cursor-pointer'
+                    : 'bg-gray-200 opacity-60 cursor-not-allowed'
+                }`}
+                style={{ boxShadow: '0 3px 7px rgba(0, 0, 0, 0.4)' }}
+              >
+                <p
+                  className={`font-bold md:text-[27px] text-[24px] font-roboto ${
+                    canContinue ? 'text-[#6D924B]' : 'text-gray-600'
+                  }`}
+                >
+                  {isContinuing ? 'Continuing...' : 'Continue'}
+                </p>
+                <div
+                  className={`w-[38px] h-[38px] flex justify-center items-center rounded-[50%] ${
+                    canContinue ? 'bg-[#C0D066]' : 'bg-gray-300'
+                  }`}
+                >
                   <Image src={sideArrow} alt="sideArrow" />
                 </div>
               </button>

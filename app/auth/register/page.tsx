@@ -74,7 +74,6 @@ export default function RegisterPage() {
                         name="name"
                         control={control}
                         label="Name"
-                        placeholder="john"
                         rules={{
                           required: 'Name is required',
                           minLength: {
@@ -90,7 +89,6 @@ export default function RegisterPage() {
                         name="email"
                         control={control}
                         label="Email"
-                        placeholder="johnjacob@mail.com"
                         rules={{
                           required: 'Email is required',
                           pattern: {
@@ -107,7 +105,6 @@ export default function RegisterPage() {
                           name="password"
                           control={control}
                           label="Password"
-                          placeholder="**********"
                           type="password"
                           rules={{
                             required: 'Password is required',

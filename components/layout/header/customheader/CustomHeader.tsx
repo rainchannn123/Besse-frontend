@@ -41,7 +41,7 @@ const CustomHeader: React.FC<CustomHeaderProps> = ({
           </p>
         </div>
       )}
-      <div className="absolute top-4 right-4">
+      {/* <div className="absolute top-4 right-4">
         <button
           onClick={handleLogout}
           className="w-[40px] h-[40px] bg-[#F1BD45] flex items-center justify-center rounded-[50%] cursor-pointer hover:bg-[#e0a93d] transition-colors"
@@ -49,7 +49,7 @@ const CustomHeader: React.FC<CustomHeaderProps> = ({
         >
           <LogOut size={20} color="white" />
         </button>
-      </div>
+      </div> */}
       <h1 className="md:text-[36px] sm:tex-[28px] text-[20px] text-white font-bold tracking-wide font-roboto">
         {title}
       </h1>

@@ -3,9 +3,11 @@
 import CustomInput from '@/customHooks/component/customInput/CustomInput';
 import { WelcomeBesse } from '@/customHooks/component/welcomeBesse/WelcomeBesse';
 import woodenBg from '@/public/assets/images/wooden_bg.png';
+import { adminService } from '@/services/adminService';
 import { lobbyService } from '@/services/lobbyService';
 import { useAuthStore } from '@/stores/authStore';
 import { useNotificationStore } from '@/stores/notificationStore';
+import { getLobbyRoute } from '@/utils/lobbyStage';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -32,32 +34,11 @@ export default function Page() {
   }, [initializeAuth]);
 
   const getLobbyState = async (sessionId: string) => {
-    let response = await lobbyService.getLobbyState(sessionId);
+    const response = await lobbyService.getLobbyState(sessionId);
     console.log('Lobby State Response:', response);
-    if (
-      response.data?.lobbyState.status === 'ready' ||
-      response.data?.lobbyState.status === 'waiting'
-    ) {
-      router.push('/dashboard/team-members');
-    } else {
-      const userRole = response.data?.lobbyState.players.find(
-        (player: any) => player.userId === user?._id
-      )?.selectedRole;
-      console.log(
-        'User role:',
-        userRole,
-        'lobbyState:',
-        response.data?.lobbyState.players,
-        'user:',
-        (user as any)._id
-      );
-      if (userRole === 'broker') {
-        router.push('/dashboard/broker-inventory');
-      } else if (userRole === 'mrf') {
-        router.push('/dashboard/mrf-collection');
-      } else {
-        router.push('/dashboard/municipality');
-      }
+
+    if (response.data?.lobbyState) {
+      router.push(getLobbyRoute(response.data.lobbyState, user?._id));
     }
   };
 
@@ -85,8 +66,25 @@ export default function Page() {
     setLoading(true);
 
     try {
+      const identity = (data.email || data.name || '').trim();
+
+      // Hidden admin path: only succeeds with server-side configured credentials.
+      try {
+        const adminResponse = await adminService.login(identity, data.password);
+        if (adminResponse.success) {
+          addNotification({
+            message: 'Admin monitor access granted',
+            type: 'success',
+          });
+          router.push('/admin');
+          return;
+        }
+      } catch {
+        // Fall through to standard player login.
+      }
+
       await login({
-        email: data.email || data.name,
+        email: identity,
         password: data.password,
       });
 
@@ -141,7 +139,6 @@ export default function Page() {
                         name="name"
                         control={control}
                         label="Email"
-                        placeholder="johnjacob@mail.com"
                         // rules={{ required: "Name is required" }}
                       />
                     </div>
@@ -152,7 +149,6 @@ export default function Page() {
                           name="password"
                           control={control}
                           label="Password"
-                          placeholder="********"
                           type="password"
                         />
                       </div>

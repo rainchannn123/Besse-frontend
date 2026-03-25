@@ -6,6 +6,7 @@ import { MunicipalityMaterialSelectedBox } from '@/components/ui/selectedBox/Mun
 import { MunicipalityWasteSelectedBox } from '@/components/ui/selectedBox/MunicipalityWasteSelectedBox';
 import ShiftLog from '@/components/ui/shiftLog/ShiftLog';
 import { WasteCollectAction } from '@/components/ui/wasteCollectAction/WasteCollectAction';
+import { SurrenderButton } from '@/components/ui/surrenderButton/SurrenderButton';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import woodenBg from '@/public/assets/images/wooden_bg.png';
 import woodenHead from '@/public/assets/images/woodenHead.png';
@@ -39,7 +40,7 @@ export default function MunicipalityPage() {
   const [statistics, setStatistics] = useState<any | null>(null);
   const [countdownRemaining, setCountdownRemaining] = useState<number | null>(null);
   const [lastActionType, setLastActionType] = useState<string | null>(null);
-  const { getCurrentGameSession, notifications, isConnected, subscribe, joinGame } = useWebSocket();
+  const { getCurrentGameSession, notifications, isConnected, subscribe, joinGame, emit } = useWebSocket();
 
   const currentGameState = gameState;
   const fetchGameState = async () => {
@@ -317,6 +318,13 @@ export default function MunicipalityPage() {
       }
     });
 
+    // Surrender vote updates from other players
+    const unsubSurrenderUpdate = subscribe('surrender-update', (data: any) => {
+      if (data?.surrenderVotes && gameState) {
+        setGameState((prev) => prev ? { ...prev, surrenderVotes: data.surrenderVotes } : prev);
+      }
+    });
+
     return () => {
       unsubGameStateUpdate && unsubGameStateUpdate();
       unsubGameStateFull && unsubGameStateFull();
@@ -330,6 +338,7 @@ export default function MunicipalityPage() {
       unsubSystemMessage && unsubSystemMessage();
       unsubAuctionsResolved && unsubAuctionsResolved();
       unsubExternalPurchase && unsubExternalPurchase();
+      unsubSurrenderUpdate && unsubSurrenderUpdate();
     };
   }, [subscribe, router, fetchWasteBatches, fetchCityProjects]);
 
@@ -413,21 +422,46 @@ export default function MunicipalityPage() {
     // Check if selectedItem is a WasteBatch (has status property)
     if (selectedItem && 'status' in selectedItem) {
       if (selectedItem.status === 'PENDING') {
-        const response = await municipalityService.collectWaste(user.currentSession, {
-          batchId: selectedItem.id,
-          sessionId: user.currentSession,
-        });
-        if (response.success) {
+        // Pre-check: ensure sufficient budget before attempting collection
+        const constants = authoritativeState?.constants;
+        const costPerTon =
+          (constants?.FIXED_DISTANCE_TO_MRF_KM ?? 10) *
+          (constants?.TRANSPORT_COST_PER_TON_KM ?? 2.5);
+        const estimatedCost = (selectedItem as WasteBatch).mass * costPerTon;
+        const currentBudget = authoritativeState?.budget ?? 0;
+        if (currentBudget < estimatedCost) {
           addNotification({
-            message: 'Waste Sent to MRF',
-            type: 'success',
+            message: `Insufficient budget. This collection costs $${estimatedCost.toFixed(2)} but your budget is $${currentBudget.toFixed(2)}.`,
+            type: 'error',
           });
-          setSelectedItem(null);
-          fetchGameState();
-          fetchWasteBatches();
-        } else {
+          return;
+        }
+
+        try {
+          const response = await municipalityService.collectWaste(user.currentSession, {
+            batchId: selectedItem.id,
+            sessionId: user.currentSession,
+          });
+          if (response.success) {
+            addNotification({
+              message: 'Waste Sent to MRF',
+              type: 'success',
+            });
+            setSelectedItem(null);
+            fetchGameState();
+            fetchWasteBatches();
+          } else {
+            addNotification({
+              message: response.message || 'Failed to collect waste',
+              type: 'error',
+            });
+          }
+        } catch (err: any) {
           addNotification({
-            message: response.message || 'Failed to collect waste',
+            message:
+              err?.response?.data?.message ||
+              err?.message ||
+              'Insufficient budget for waste collection',
             type: 'error',
           });
         }
@@ -458,28 +492,44 @@ export default function MunicipalityPage() {
       return;
     }
 
-    const response = await municipalityService.constructProject(user.currentSession, {
-      projectId,
-      materialType: materialType as 'paper' | 'plastic' | 'metal' | 'glass' | 'wood',
-      materialAmount,
-      sessionId: user.currentSession,
-    });
-    if (response.success) {
-      addNotification({
-        message: 'Material contributed to project successfully!',
-        type: 'success',
+    try {
+      const response = await municipalityService.constructProject(user.currentSession, {
+        projectId,
+        materialType: materialType as 'paper' | 'plastic' | 'metal' | 'glass' | 'wood',
+        materialAmount,
+        sessionId: user.currentSession,
       });
-      setSelectedMaterial(null);
-      setSelectedProject(null);
-      fetchGameState();
-      fetchCityProjects();
-    } else {
+
+      if (response.success) {
+        addNotification({
+          message: 'Material contributed to project successfully!',
+          type: 'success',
+        });
+        setSelectedMaterial(null);
+        setSelectedProject(null);
+        fetchGameState();
+        fetchCityProjects();
+      } else {
+        addNotification({
+          message: response.message || 'Failed to construct project',
+          type: 'error',
+        });
+      }
+    } catch (err: any) {
       addNotification({
-        message: response.message || 'Failed to construct project',
+        message: err?.response?.data?.message || err?.message || 'Failed to construct project',
         type: 'error',
       });
     }
   };
+
+  const handleSurrenderToggle = () => {
+    if (!user?.currentSession) return;
+    emit('surrender-toggle', { sessionId: user.currentSession });
+  };
+
+  const surrenderVotes = authoritativeState?.surrenderVotes ?? [];
+  const canSurrender = (authoritativeState?.minutesElapsed ?? 0) >= 15;
 
   return (
     <div>
@@ -587,6 +637,10 @@ export default function MunicipalityPage() {
                     maxCapacity={authoritativeState?.maxCapacity ?? currentGameState?.maxCapacity}
                     selectedBatch={selectedItem}
                     handleCollectWaste={handleCollectWaste}
+                    transportCostPerTon={
+                      (authoritativeState?.constants?.FIXED_DISTANCE_TO_MRF_KM ?? 10) *
+                      (authoritativeState?.constants?.TRANSPORT_COST_PER_TON_KM ?? 2.5)
+                    }
                   />
                 ) : null
               ) : selectedMaterial ? (
@@ -605,6 +659,12 @@ export default function MunicipalityPage() {
           </div>
         </div>
       </div>
+      <SurrenderButton
+        playerId={user?._id ?? ''}
+        surrenderVotes={surrenderVotes}
+        canSurrender={canSurrender}
+        onToggle={handleSurrenderToggle}
+      />
     </div>
   );
 }

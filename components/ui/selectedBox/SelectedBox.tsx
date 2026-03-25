@@ -102,6 +102,9 @@ export const SelectedBox: React.FC<SelectedBoxProps> = ({
                   <p className="text-lg font-bold text-green-600 mt-2">
                     Health Bonus: +{project.healthBonus}%
                   </p>
+                  <p className="text-sm font-semibold text-emerald-700 mt-1">
+                    Budget Bonus: +${(project.budgetBonus ?? 0).toFixed(0)}
+                  </p>
                 </div>
 
                 {/* Required Materials */}

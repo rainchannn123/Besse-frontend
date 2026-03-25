@@ -83,7 +83,7 @@ export const MRFInvent: React.FC<MRFInventProps> = ({
               <button
                 onClick={handleConfirm}
                 disabled={!selectedGrade}
-                className="w-full bg-[#6D974D] hover:bg-[#5a8a42] flex justify-around rounded-[5px] disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full bg-[#50704C] hover:bg-[#5a8a42] flex justify-around rounded-[5px] disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <p></p>
                 <p className="text-white py-2 rounded-[5px] font-bold 2xl:text-[24px] xl:text-[16px] lg:text-[24px] text-[24px]">

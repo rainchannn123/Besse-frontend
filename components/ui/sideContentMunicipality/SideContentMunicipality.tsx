@@ -175,7 +175,7 @@ export const SideContentMunicipality: React.FC<SideContentMunicipalityProps> = (
                 toast.error('Select a waste batch');
               }
             }}
-            className="px-2 rounded-[5px] bg-[#6D974D] flex gap-4"
+            className="px-2 rounded-[5px] bg-[#50704C] flex gap-4"
           >
             <p className="text-white py-2 font-bold 2xl:text-[24px]  xl:text-[16px] lg:text-[24px] text-[24px]">
               Confirm

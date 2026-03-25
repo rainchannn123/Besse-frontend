@@ -73,6 +73,8 @@ class SocketManager {
 
   // Game-specific state
   private currentGameSession: string | null = null;
+  private lastJoinedSession: string | null = null;
+  private lastJoinedSocketId: string | null = null;
 
   connect(): void {
     if (this.socket?.connected) {
@@ -198,14 +200,27 @@ class SocketManager {
       return;
     }
 
+    const socketId = this.socket.id || null;
+    if (this.lastJoinedSession === sessionId && this.lastJoinedSocketId === socketId) {
+      return;
+    }
+
     console.log('[SocketManager] EMITTING join-game event for sessionId:', sessionId);
     this.socket.emit('join-game', { sessionId });
+    this.lastJoinedSession = sessionId;
+    this.lastJoinedSocketId = socketId;
   }
 
   leaveGame(sessionId: string): void {
     if (this.socket?.connected) {
       this.socket.emit('leave-game', { sessionId });
     }
+
+    if (this.lastJoinedSession === sessionId) {
+      this.lastJoinedSession = null;
+      this.lastJoinedSocketId = null;
+    }
+
     if (this.currentGameSession === sessionId) {
       this.currentGameSession = null;
       this.persistGameSession(null);
@@ -304,6 +319,8 @@ class SocketManager {
 
     this.socket.on('disconnect', (reason: any) => {
       console.log('WebSocket disconnected:', reason);
+      this.lastJoinedSession = null;
+      this.lastJoinedSocketId = null;
       this.emitEvent('disconnected');
       this.handleReconnect();
     });

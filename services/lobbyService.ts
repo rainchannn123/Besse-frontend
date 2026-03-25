@@ -1,11 +1,17 @@
 
 import api from '../config/api';
 import {
+  ContinueToPairingRequest,
+  ContinueToPairingResponse,
+  ContinueToRoleSelectionRequest,
+  ContinueToRoleSelectionResponse,
   CreateLobbyResponse,
   JoinLobbyRequest,
   JoinLobbyResponse,
   JoinPairingQueueRequest,
   JoinPairingQueueResponse,
+  LeaveLobbyRequest,
+  LeaveLobbyResponse,
   LeavePairingQueueRequest,
   LeavePairingQueueResponse,
   LobbyListResponse,
@@ -47,6 +53,31 @@ export const lobbyService = {
 
   async getLobbyState(sessionId: string): Promise<LobbyStateResponse> {
     const response = await api.get<LobbyStateResponse>(`/lobby/${sessionId}`);
+    return response.data;
+  },
+
+  async leaveLobby(data: LeaveLobbyRequest): Promise<LeaveLobbyResponse> {
+    const response = await api.post<LeaveLobbyResponse>('/lobby/leave', data);
+    return response.data;
+  },
+
+  async continueToRoleSelection(
+    data: ContinueToRoleSelectionRequest
+  ): Promise<ContinueToRoleSelectionResponse> {
+    const response = await api.post<ContinueToRoleSelectionResponse>(
+      '/lobby/continue-to-role-selection',
+      data
+    );
+    return response.data;
+  },
+
+  async continueToPairing(
+    data: ContinueToPairingRequest
+  ): Promise<ContinueToPairingResponse> {
+    const response = await api.post<ContinueToPairingResponse>(
+      '/lobby/continue-to-pairing',
+      data
+    );
     return response.data;
   },
 

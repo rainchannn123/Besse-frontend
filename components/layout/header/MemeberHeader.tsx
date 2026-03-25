@@ -2,19 +2,31 @@
 
 import rightSideArrow from '@/public/assets/images/arrow.png';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import React from 'react';
 
 export const MemberHeader: React.FC = () => {
   const router = useRouter();
+  const pathname = usePathname();
+
   const handleBack = () => {
-    router.back();
+    if (pathname.startsWith('/dashboard/team-member')) {
+      router.push('/dashboard/besse-group');
+      return;
+    }
+
+    if (pathname.startsWith('/dashboard/role')) {
+      router.push('/dashboard/team-members');
+      return;
+    }
+
+    router.push('/dashboard/besse-group');
   };
   return (
-    <div className="bg-[#6D974D] py-4">
-      <div className="max-w-[1550px] mx-auto flex  sm:flex-row items-center justify-between px-4 sm:px-8 gap-4 sm:gap-0">
+    <div className="bg-[#50704C] py-4">
+      <div className="max-w-[1550px] mx-auto flex h-[38px] sm:flex-row items-center justify-between px-4 sm:px-8 gap-4 sm:gap-0">
         {/* Back Button */}
-        <div className="md:flex hidden justify-center sm:justify-start w-full sm:w-auto">
+        {/* <div className="md:flex hidden justify-center sm:justify-start w-full sm:w-auto">
           <button
             onClick={handleBack}
             className="flex items-center lg:gap-20 md:gap-10 gap-20 bg-white px-4 py-2 rounded-[5px] transition-transform hover:scale-105"
@@ -25,14 +37,14 @@ export const MemberHeader: React.FC = () => {
             </div>
             <p className="text-[#6D924B] font-bold text-[20px] sm:text-[24px] font-roboto">Back</p>
           </button>
-        </div>
+        </div> */}
 
         {/* Center Title */}
-        <div className="flex  text-center sm:text-left">
-          {/* <h1 className="font-bold text-[18px] sm:text-[27px] md:text-[40px] font-roboto text-white">
+        {/* <div className="flex  text-center sm:text-left">
+          <h1 className="font-bold text-[18px] sm:text-[27px] md:text-[40px] font-roboto text-white">
             Besse
-          </h1> */}
-        </div>
+          </h1>
+        </div> */}
 
         {/* User Info */}
         <div className="flex items-center md:justify-center justify-end  sm:w-auto gap-4">

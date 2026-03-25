@@ -9,6 +9,7 @@ import {
   PendingAuction,
 } from '@/components/ui/selectedBox/MRFPendingAuctionSelectedBox';
 import ShiftLog from '@/components/ui/shiftLog/ShiftLog';
+import { SurrenderButton } from '@/components/ui/surrenderButton/SurrenderButton';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import woodenBg from '@/public/assets/images/wooden_bg.png';
 import woodenHead from '@/public/assets/images/woodenHead.png';
@@ -40,7 +41,7 @@ export default function MRFCollectionPage() {
   const [statistics, setStatistics] = useState<any | null>(null);
   const [countdownRemaining, setCountdownRemaining] = useState<number | null>(null);
   const [lastActionType, setLastActionType] = useState<string | null>(null);
-  const { getCurrentGameSession, notifications, isConnected, subscribe, joinGame } = useWebSocket();
+  const { getCurrentGameSession, notifications, isConnected, subscribe, joinGame, emit } = useWebSocket();
 
   console.log({ currentGame: getCurrentGameSession(), notifications });
 
@@ -312,6 +313,12 @@ export default function MRFCollectionPage() {
       );
     });
 
+    const unsubSurrenderUpdate = subscribe('surrender-update', (data: any) => {
+      if (data?.surrenderVotes) {
+        setGameState((prev) => prev ? { ...prev, surrenderVotes: data.surrenderVotes } : prev);
+      }
+    });
+
     return () => {
       unsubGameStateUpdate && unsubGameStateUpdate();
       unsubGameStateFull && unsubGameStateFull();
@@ -323,6 +330,7 @@ export default function MRFCollectionPage() {
       unsubCountdownCancelled && unsubCountdownCancelled(); // Added cleanup
       unsubPlayerAction && unsubPlayerAction();
       unsubSystemMessage && unsubSystemMessage();
+      unsubSurrenderUpdate && unsubSurrenderUpdate();
     };
   }, [subscribe, router, fetchQueue, fetchInventory, fetchPendingAuctions]);
 
@@ -567,6 +575,14 @@ export default function MRFCollectionPage() {
           </div>
         </div>
       </div>
+      <SurrenderButton
+        playerId={user?._id ?? ''}
+        surrenderVotes={authoritativeState?.surrenderVotes ?? []}
+        canSurrender={(authoritativeState?.minutesElapsed ?? 0) >= 15}
+        onToggle={() => {
+          if (user?.currentSession) emit('surrender-toggle', { sessionId: user.currentSession });
+        }}
+      />
     </div>
   );
 }

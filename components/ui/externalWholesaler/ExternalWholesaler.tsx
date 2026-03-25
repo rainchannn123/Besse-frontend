@@ -93,7 +93,7 @@ export const ExternalWholesaler: React.FC<ExternalWholesalerProps> = ({ stock, o
                   <button
                     onClick={() => handleBuy(item.materialType)}
                     disabled={!canBuy}
-                    className="bg-[#6D974D] hover:bg-[#5a8a42] text-white py-2 px-6 rounded-md font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="bg-[#50704C] hover:bg-[#5a8a42] text-white py-2 px-6 rounded-md font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Buy
                   </button>

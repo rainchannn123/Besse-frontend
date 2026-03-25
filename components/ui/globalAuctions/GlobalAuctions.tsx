@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 interface Auction {
   auctionId: string;
@@ -26,6 +26,13 @@ export const GlobalAuctions: React.FC<GlobalAuctionsProps> = ({
   onPlaceBid,
   currentUserId,
 }) => {
+  // Tick every second so time remaining display stays accurate
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+
   const getTimeRemaining = (endsAt: string | number) => {
     const now = new Date().getTime();
     const end = new Date(endsAt).getTime();
@@ -91,7 +98,7 @@ export const GlobalAuctions: React.FC<GlobalAuctionsProps> = ({
               <button
                 onClick={() => onPlaceBid(auction.auctionId)}
                 disabled={auction.status !== 'active'}
-                className="w-full bg-[#6D974D] hover:bg-[#5a8a42] text-white py-2 rounded-md font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full bg-[#50704C] hover:bg-[#5a8a42] text-white py-2 rounded-md font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Place Bid
               </button>

@@ -17,6 +17,7 @@ interface WasteCollectActionProps {
   maxCapacity?: number;
   selectedBatch?: WasteBatch | null;
   handleCollectWaste?: () => void;
+  transportCostPerTon?: number;
 }
 
 export const WasteCollectAction: React.FC<WasteCollectActionProps> = ({
@@ -26,7 +27,9 @@ export const WasteCollectAction: React.FC<WasteCollectActionProps> = ({
   maxCapacity = 0,
   selectedBatch,
   handleCollectWaste,
+  transportCostPerTon = 25,
 }) => {
+  const transportFee = selectedBatch ? selectedBatch.mass * transportCostPerTon : 0;
   const [actionSelected, setActionSelected] = useState(false);
 
   return (
@@ -47,6 +50,15 @@ export const WasteCollectAction: React.FC<WasteCollectActionProps> = ({
           <p className="2xl:text-[25px] xl:text-[20px] lg:text-[25px]  text-[25px] font-bold text-black  font-roboto">
             Mass: {selectedBatch ? `${Number(selectedBatch.mass).toFixed(2)}t` : '0.00t'}
           </p>
+        </div>
+
+        {/* Transportation Fee Info */}
+        <div className="mx-2 mb-4 bg-amber-50 border border-amber-300 rounded-md p-3">
+          <p className="text-center text-sm font-bold text-amber-800 mb-1">Transportation Fee</p>
+          <div className="flex justify-between items-center">
+            <span className="text-xs text-amber-700">Rate: ${transportCostPerTon.toFixed(2)}/ton</span>
+            <span className="text-base font-bold text-amber-900">${transportFee.toFixed(2)}</span>
+          </div>
         </div>
 
         <div className="flex justify-center mb-4">
@@ -73,7 +85,7 @@ export const WasteCollectAction: React.FC<WasteCollectActionProps> = ({
 
         <button
           onClick={handleCollectWaste}
-          className="w-full bg-[#6D974D] hover:bg-[#5a8a42] flex justify-around rounded-[5px] disabled:opacity-50"
+          className="w-full bg-[#50704C] hover:bg-[#5a8a42] flex justify-around rounded-[5px] disabled:opacity-50"
           disabled={!selectedBatch || selectedBatch.status !== 'PENDING' || !actionSelected}
         >
           <p></p>

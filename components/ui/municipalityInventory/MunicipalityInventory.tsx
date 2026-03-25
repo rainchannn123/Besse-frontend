@@ -71,7 +71,7 @@ export const MunicipalityInventory: React.FC = () => {
                 </div>
             </div>
 
-            <button className="w-full bg-[#6D974D]  hover:bg-[#6D974D] flex justify-around  rounded-[5px]">
+            <button className="w-full bg-[#50704C]  hover:bg-[#50704C] flex justify-around  rounded-[5px]">
                 <p className="text-white py-2 rounded-[5px] font-bold 2xl:text-[24px]  xl:text-[16px] lg:text-[24px] text-[24px]">
                     Send to Broker
                 </p>

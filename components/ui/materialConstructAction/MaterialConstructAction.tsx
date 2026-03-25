@@ -37,20 +37,11 @@ export const MaterialConstructAction: React.FC<MaterialConstructActionProps> = (
 
   const availableAmount = municipalInventory[selectedMaterial as MaterialType] || 0;
 
-  // Find any project that is currently in progress (not completed)
-  const inProgressProject = useMemo(() => {
-    return cityProjects.find((p) => !p.completed && p.progress > 0);
-  }, [cityProjects]);
-
   // Determine which projects can be selected
   const selectableProjects = useMemo(() => {
-    // If there's an in-progress project, only that can be selected
-    if (inProgressProject) {
-      return [inProgressProject];
-    }
-    // Otherwise, show all incomplete projects
+    // Show all incomplete projects; backend now allows free project selection.
     return cityProjects.filter((p) => !p.completed);
-  }, [cityProjects, inProgressProject]);
+  }, [cityProjects]);
 
   // Get the required amount for the selected material in the selected project
   const requiredMaterialAmount = useMemo(() => {
@@ -105,17 +96,10 @@ export const MaterialConstructAction: React.FC<MaterialConstructActionProps> = (
           <option value="">Select a project</option>
           {selectableProjects.map((project) => (
             <option key={project.id} value={project.id}>
-              {project.name}{' '}
-              {inProgressProject && project.id === inProgressProject.id ? '(In Progress)' : ''}
+              {project.name}
             </option>
           ))}
         </select>
-        {inProgressProject && selectedProject?.id !== inProgressProject.id && (
-          <p className="text-xs text-orange-600 mt-1">
-            ⚠ Project "{inProgressProject.name}" is in progress and must be completed before
-            starting a new project.
-          </p>
-        )}
       </div>
 
       {selectedProject && (
@@ -131,6 +115,9 @@ export const MaterialConstructAction: React.FC<MaterialConstructActionProps> = (
               </p>
               <p>
                 <span className="font-medium">Health Bonus:</span> +{selectedProject.healthBonus}%
+              </p>
+              <p>
+                <span className="font-medium">Budget Bonus:</span> +${(selectedProject.budgetBonus ?? 0).toFixed(0)}
               </p>
             </div>
           </div>
@@ -263,7 +250,7 @@ export const MaterialConstructAction: React.FC<MaterialConstructActionProps> = (
               !isValidMaterialType ||
               !selectedProject
             }
-            className="w-full bg-[#6D974D] hover:bg-[#5a8a42] flex justify-around rounded-[5px] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="w-full bg-[#50704C] hover:bg-[#5a8a42] flex justify-around rounded-[5px] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <p></p>
             <p className="text-white py-2 rounded-[5px] font-bold 2xl:text-[24px] xl:text-[16px] lg:text-[24px] text-[24px]">

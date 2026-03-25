@@ -200,10 +200,18 @@ export interface ProfileResponse
     };
   }> {}
 
+export type LobbyStage =
+  | 'waiting-room'
+  | 'role-selection'
+  | 'pairing'
+  | 'in-game'
+  | 'completed';
+
 export interface LobbyState {
   sessionId: string;
   lobbyCode: string; // 6-character alphanumeric code for joining
   leader: string; // User ID of the lobby leader
+  stage: LobbyStage;
   players: {
     userId: string;
     name: string;
@@ -243,6 +251,10 @@ export interface SelectRoleRequest {
   role: PlayerRole;
 }
 
+export interface LeaveLobbyRequest {
+  sessionId: string;
+}
+
 export interface SelectRoleResponse
   extends ApiResponse<{
     lobby: LobbyState;
@@ -254,6 +266,7 @@ export interface LobbyStateResponse
       sessionId: string;
       lobbyCode: string;
       leader: string;
+      stage: LobbyStage;
       players: Array<{
         userId: string;
         name: string;
@@ -262,13 +275,47 @@ export interface LobbyStateResponse
       }>;
       status: 'waiting' | 'ready' | 'active' | 'completed';
       createdAt: string;
-      maxPlayers: 3;
+      maxPlayers: number;
+    };
+  }> {}
+
+export interface LeaveLobbyResponse
+  extends ApiResponse<{
+    leaveResult: {
+      sessionId: string;
+      leftUserId: string;
+      leftUserName: string;
+      leader: string | null;
+      status: 'waiting' | 'ready' | 'active' | 'completed' | 'closed';
+      currentSessionCleared: boolean;
+      lobbyDeleted: boolean;
+      playersRemaining: number;
+      alreadyLeft: boolean;
+      lobbyState: LobbyState | null;
     };
   }> {}
 
 export interface StartGameRequest {
   sessionId: string;
 }
+
+export interface ContinueToRoleSelectionRequest {
+  sessionId: string;
+}
+
+export interface ContinueToPairingRequest {
+  sessionId: string;
+}
+
+export interface ContinueToRoleSelectionResponse
+  extends ApiResponse<{
+    lobbyState: LobbyState;
+  }> {}
+
+export interface ContinueToPairingResponse
+  extends ApiResponse<{
+    lobbyState: LobbyState;
+  }> {}
 
 export interface StartGameResponse
   extends ApiResponse<{
@@ -439,6 +486,9 @@ export interface GameState {
     wood: number;
   };
 
+  // NEW: Surrender voting — all 3 must vote to end the game early
+  surrenderVotes?: string[]; // array of playerIds who have voted to surrender
+
   // NEW: Marketplace Listing for live auctions
   marketplaceListing: Auction[];
 
@@ -583,6 +633,7 @@ export interface CityProject {
   progress: number;
   completed: boolean;
   healthBonus: number;
+  budgetBonus: number;
   deadline: number;
 }
 
@@ -604,6 +655,7 @@ export interface ConstructProjectResponse
     message: string;
     updatedInventory: Record<MaterialType, number>;
     healthBonusApplied: number;
+    budgetBonusApplied?: number;
   }> {}
 
 // MRF Types
@@ -825,6 +877,7 @@ export interface WebSocketEventData {
       sessionId: string;
       lobbyCode: string;
       leader: string;
+      stage: LobbyStage;
       players: Array<{
         userId: string;
         name: string;
@@ -835,6 +888,7 @@ export interface WebSocketEventData {
       createdAt: string;
       maxPlayers: 3;
     };
+    reason?: string;
     timestamp: number;
   };
   'waste-collected': {
