@@ -1,6 +1,7 @@
 'use client';
 
 import CustomHeader from '@/components/layout/header/customheader/CustomHeader';
+import GameModeBadge from '@/components/ui/GameModeBadge';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import factory from '@/public/assets/images/Factory.png';
 import sideArrow from '@/public/assets/images/sideArrow.png';
@@ -83,9 +84,9 @@ export default function RolePage() {
         role: 'municipality' as PlayerRole,
         name: '',
         description: [
-          "Check the city health data, how they are affected by all three role's actions",
-          'If one of them is too high or low, game over',
-          'The data can affect the cost (Sem B)',
+          "Collect the city's waste and manage transportation",
+          "Develop the city's waste management strategy",
+          "Lead the city's development"
         ],
       },
       {
@@ -94,11 +95,9 @@ export default function RolePage() {
         role: 'mrf' as PlayerRole,
         name: '',
         description: [
-          'Check the Waste Composition, how they are affected by production',
-          'High cost → more organic waste',
-          'More organic → less pollution',
-          'More chemical, xxx → worse pollution',
-          'They can dump different types of waste',
+          "Responsible for Waste Processing",
+          "Bridge communication and connection between Municipality and Broker",
+          "Manage the sales of recyclable materials"
         ],
       },
       {
@@ -107,9 +106,9 @@ export default function RolePage() {
         role: 'broker' as PlayerRole,
         name: '',
         description: [
-          "Check the Trade Desk, the three actions' trade when expensive, cheap",
-          'They can check if the production income increases or decreases',
-          'Companies, types would be also different (Sem B)',
+          "Responsible for useful material procurement",
+          "Develop the business strategy to maximize profit, while balancing the city's emissions and health",
+          "Important role for negotiation and deal-making with Municipality and MRF, as well as the competitors"
         ],
       },
     ];
@@ -315,7 +314,7 @@ export default function RolePage() {
     });
 
     const unSubcribeGameStarted = subscribe('game-started', (data: any) => {
-      console.log('Game started event received in role page:', data);
+      // console.log('Game started event received in role page:', data);
       if (data?.sessionId === userInfo?.currentSession) {
         const players = extractPlayers(data);
         const currentPlayer = players.find((player: any) => player.userId === userInfo._id);
@@ -333,7 +332,7 @@ export default function RolePage() {
     });
 
     const unsubLobbyActivated = subscribe('lobby-activated', (data: any) => {
-      console.log('Lobby activated event received: in role page', data);
+      // console.log('Lobby activated event received: in role page', data);
       scheduleLobbyRefresh();
 
       if (data?.lobby?.status === 'active') {
@@ -387,7 +386,7 @@ export default function RolePage() {
   // Ensure we're connected to the game room to receive game-started events
   useEffect(() => {
     if (userInfo?.currentSession && isConnected) {
-      console.log('Role page: Joining game room with sessionId:', userInfo.currentSession);
+      // console.log('Role page: Joining game room with sessionId:', userInfo.currentSession);
       joinGame(userInfo.currentSession);
     }
   }, [userInfo?.currentSession, isConnected, joinGame]);
@@ -525,6 +524,7 @@ export default function RolePage() {
           title="Select Role"
           subtitle="Select a role to start playing the game"
         />
+        <GameModeBadge gameMode={lobbyState?.gameMode} />
 
         <div className="md:px-8 px-4 pt-16 pb-6">
           <div className="grid lg:grid-cols-3 md:grid-cols-2 grid-cols-1 lg:gap-6 gap-18 sm:gap-12">

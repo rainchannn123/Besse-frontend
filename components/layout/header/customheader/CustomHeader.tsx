@@ -19,7 +19,7 @@ const CustomHeader: React.FC<CustomHeaderProps> = ({
 }) => {
   const { logout } = useAuthStore();
   const router = useRouter();
-  console.log('');
+  // console.log('');
   const handleLogout = () => {
     logout();
     router.push('/auth/login');

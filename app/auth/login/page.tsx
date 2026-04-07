@@ -35,7 +35,7 @@ export default function Page() {
 
   const getLobbyState = async (sessionId: string) => {
     const response = await lobbyService.getLobbyState(sessionId);
-    console.log('Lobby State Response:', response);
+    // console.log('Lobby State Response:', response);
 
     if (response.data?.lobbyState) {
       router.push(getLobbyRoute(response.data.lobbyState, user?._id));

@@ -1,12 +1,12 @@
 'use client';
 
 import CustomHeader from '@/components/layout/header/customheader/CustomHeader';
+import GameModeBadge from '@/components/ui/GameModeBadge';
 import woodenBg from '@/public/assets/images/wooden_bg.png';
 import woodenHeading from '@/public/assets/images/woodenHeading.png';
 import { useAuthStore } from '@/stores/authStore';
 import { useRouter } from 'next/navigation';
 import { use, useCallback, useEffect, useState } from 'react';
-import { NotificationCenter } from '../../../components/ui/notifications/NotificationCenter';
 import { PairingQueue } from '../../../components/ui/pairing/PairingQueue';
 import { PairingStatus } from '../../../components/ui/pairing/PairingStatus';
 import { PairingWaitingRoom } from '../../../components/ui/pairing/PairingWaitingRoom';
@@ -34,22 +34,21 @@ export default function PairingPage({ searchParams }: PairingPageProps) {
   if (sessionId && !params?.sessionId && localStorage.getItem('pairing_session_id') === sessionId) {
     localStorage.removeItem('pairing_session_id');
   }
-  console.log('Pairing Page sessionId:', sessionId);
+  // console.log('Pairing Page sessionId:', sessionId);
   const [isStartingGame, setIsStartingGame] = useState(false);
-  const [dismissedNotifications, setDismissedNotifications] = useState<Set<number>>(new Set());
   const [autoStartCountdown, setAutoStartCountdown] = useState<number | null>(null);
   const [isLeader, setIsLeader] = useState(false);
+  const [gameMode, setGameMode] = useState<string | null>(null);
 
   const {
     pairingStatus,
-    notifications,
     isLoading,
     partnerMetrics,
     joinPairingQueue,
     leavePairingQueue,
     getPairingResult,
   } = usePairingSystem(sessionId!, true);
-  console.log(sessionId);
+  // console.log(sessionId);
 
   useEffect(() => {
     const checkLeader = async () => {
@@ -62,6 +61,7 @@ export default function PairingPage({ searchParams }: PairingPageProps) {
         const response = await lobbyService.getLobbyState(sessionId);
         const leaderId = response.data?.lobbyState?.leader;
         setIsLeader(leaderId === user._id);
+        setGameMode((response.data?.lobbyState as any)?.gameMode || 'waste');
       } catch (error) {
         console.error('Failed to verify lobby leader:', error);
         setIsLeader(false);
@@ -90,14 +90,14 @@ export default function PairingPage({ searchParams }: PairingPageProps) {
   // This is CRITICAL - we must join the room to receive teams-paired events
   useEffect(() => {
     if (sessionId && isConnected) {
-      console.log('Pairing page: Joining game room for sessionId:', sessionId);
+      // console.log('Pairing page: Joining game room for sessionId:', sessionId);
       joinGame(sessionId);
     }
 
     // Cleanup: leave the room when component unmounts or sessionId changes
     return () => {
       if (sessionId) {
-        console.log('Pairing page: Cleanup - would leave game room for sessionId:', sessionId);
+        // console.log('Pairing page: Cleanup - would leave game room for sessionId:', sessionId);
         // Note: We don't actually call leaveGame here to avoid disconnecting
         // if user is navigating to game page
       }
@@ -110,26 +110,26 @@ export default function PairingPage({ searchParams }: PairingPageProps) {
     if (!sessionId) return;
 
     const handleTeamsPaired = (data: any) => {
-      console.log('🎯🎯🎯 Pairing page: TEAMS-PAIRED EVENT RECEIVED 🎯🎯🎯');
-      console.log('Pairing page: Event data:', JSON.stringify(data, null, 2));
-      console.log('Pairing page: My sessionId:', sessionId);
-      console.log('Pairing page: Partner sessionId:', data.partnerSessionId);
-      console.log('Pairing page: My team role:', data.teamRole);
-      console.log('Pairing page: Pair ID:', data.pairId);
+      // console.log('🎯🎯🎯 Pairing page: TEAMS-PAIRED EVENT RECEIVED 🎯🎯🎯');
+      // console.log('Pairing page: Event data:', JSON.stringify(data, null, 2));
+      // console.log('Pairing page: My sessionId:', sessionId);
+      // console.log('Pairing page: Partner sessionId:', data.partnerSessionId);
+      // console.log('Pairing page: My team role:', data.teamRole);
+      // console.log('Pairing page: Pair ID:', data.pairId);
 
       // Force update the pairing status in the store
       // This will trigger the UI to change from waiting to paired state
       if (data.pairId && data.partnerSessionId && data.teamRole) {
-        console.log('Pairing page: All required data present, UI should update now');
+        // console.log('Pairing page: All required data present, UI should update now');
         // The usePairingSystem should handle this, but we log it here to debug
       }
     };
 
-    console.log('Pairing page: Setting up teams-paired listener for sessionId:', sessionId);
+    // console.log('Pairing page: Setting up teams-paired listener for sessionId:', sessionId);
     const unsubscribe = subscribe('teams-paired', handleTeamsPaired);
 
     return () => {
-      console.log('Pairing page: Cleaning up teams-paired listener');
+      // console.log('Pairing page: Cleaning up teams-paired listener');
       if (unsubscribe) {
         unsubscribe();
       }
@@ -140,7 +140,7 @@ export default function PairingPage({ searchParams }: PairingPageProps) {
   useEffect(() => {
     const unsubGameStateFull = subscribe('game-state-full', (data: any) => {
       if (data?.gameState && data.gameState.gameStatus === 'active') {
-        console.log('Game is now active, auto-redirecting...');
+        // console.log('Game is now active, auto-redirecting...');
         // Game has started, trigger navigation
         if (autoStartCountdown === null) {
           setAutoStartCountdown(3); // Quick countdown before redirect
@@ -150,7 +150,7 @@ export default function PairingPage({ searchParams }: PairingPageProps) {
 
     const unsubGameStateUpdate = subscribe('game-state-update', (data: any) => {
       if (data?.gameState && data.gameState.gameStatus === 'active') {
-        console.log('Game state updated to active, auto-redirecting...');
+        // console.log('Game state updated to active, auto-redirecting...');
         if (autoStartCountdown === null) {
           setAutoStartCountdown(3);
         }
@@ -233,12 +233,6 @@ export default function PairingPage({ searchParams }: PairingPageProps) {
     }
   }, [autoStartCountdown, handleStartGame]);
 
-  const handleDismissNotification = (id: number) => {
-    setDismissedNotifications((prev) => new Set([...prev, id]));
-  };
-
-  const visibleNotifications = notifications.filter((n) => !dismissedNotifications.has(n.id));
-
   return (
     <div className="min-h-screen flex items-center justify-center bgColor p-6">
       <div
@@ -252,14 +246,9 @@ export default function PairingPage({ searchParams }: PairingPageProps) {
           title="Team Pairing"
           subtitle="Find your game partner and start playing"
         />
+        <GameModeBadge gameMode={gameMode} />
 
         <div className="md:px-8 px-4 pt-16 pb-6">
-          {/* Notifications */}
-          <NotificationCenter
-            notifications={visibleNotifications}
-            onDismiss={handleDismissNotification}
-          />
-
           {/* Pairing States */}
           <div className={styles.page}>
             {!pairingStatus?.isInQueue && !pairingStatus?.isPaired ? (

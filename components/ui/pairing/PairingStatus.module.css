@@ -19,13 +19,13 @@
 .title {
   font-size: 32px;
   font-weight: 700;
-  color: #1f2937;
+  color: #33552C;
   margin: 0 0 8px;
 }
 
 .subtitle {
   font-size: 14px;
-  color: #6b7280;
+  color: #8b6647;
   margin: 0;
 }
 
@@ -38,8 +38,8 @@
 }
 
 .teamCard {
-  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-  border: 2px solid #0ea5e9;
+  background: linear-gradient(135deg, #F8F0DD 0%, #f3e9da 100%);
+  border: 2px solid #b18c5a;
   padding: 24px;
   border-radius: 12px;
   text-align: center;
@@ -48,7 +48,7 @@
 .teamLabel {
   font-size: 11px;
   font-weight: 600;
-  color: #0c4a6e;
+  color: #8b6647;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 8px;
@@ -57,15 +57,15 @@
 .teamRole {
   font-size: 24px;
   font-weight: 700;
-  color: #0369a1;
+  color: #33552C;
   margin-bottom: 8px;
 }
 
 .teamStatus {
   font-size: 12px;
   font-weight: 600;
-  color: #10b981;
-  background: #d1fae5;
+  color: #33552C;
+  background: #d4e8c7;
   padding: 6px 12px;
   border-radius: 20px;
   display: inline-block;
@@ -74,7 +74,7 @@
 .divider {
   font-size: 20px;
   font-weight: 700;
-  color: #6b7280;
+  color: #8b6647;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -82,8 +82,8 @@
 }
 
 .metricsCard {
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background: #F8F0DD;
+  border: 1px solid #b18c5a;
   padding: 24px;
   border-radius: 12px;
   margin-bottom: 24px;
@@ -92,7 +92,7 @@
 .metricsTitle {
   font-size: 14px;
   font-weight: 600;
-  color: #1f2937;
+  color: #33552C;
   margin: 0 0 16px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -109,13 +109,13 @@
   padding: 12px;
   background: white;
   border-radius: 8px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #b18c5a;
 }
 
 .metric .label {
   display: block;
   font-size: 11px;
-  color: #6b7280;
+  color: #8b6647;
   font-weight: 600;
   text-transform: uppercase;
   margin-bottom: 6px;
@@ -125,12 +125,12 @@
   display: block;
   font-size: 18px;
   font-weight: 700;
-  color: #1f2937;
+  color: #33552C;
 }
 
 .pairingInfo {
-  background: #eff6ff;
-  border-left: 4px solid #3b82f6;
+  background: #F8F0DD;
+  border-left: 4px solid #b18c5a;
   padding: 16px;
   border-radius: 8px;
   margin-bottom: 24px;
@@ -138,7 +138,7 @@
 
 .infoItem {
   font-size: 13px;
-  color: #1e40af;
+  color: #33552C;
   margin: 8px 0;
   display: flex;
   justify-content: space-between;
@@ -155,8 +155,8 @@
 }
 
 .readyStatus {
-  background: #dcfce7;
-  border: 2px solid #10b981;
+  background: #d4e8c7;
+  border: 2px solid #50704C;
   padding: 20px;
   border-radius: 12px;
   margin-bottom: 24px;
@@ -183,7 +183,7 @@
 
 .readyStatus p {
   font-size: 14px;
-  color: #047857;
+  color: #33552C;
   font-weight: 600;
   margin: 0;
 }
@@ -191,11 +191,11 @@
 .startButton {
   width: 100%;
   padding: 14px 24px;
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  background: linear-gradient(135deg, #50704C 0%, #3A7D2C 100%);
   color: white;
   font-size: 16px;
   font-weight: 600;
-  border: none;
+  border: 2px solid #33552C;
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -204,7 +204,7 @@
 
 .startButton:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 10px 20px rgba(16, 185, 129, 0.3);
+  box-shadow: 0 10px 20px rgba(51, 85, 44, 0.3);
 }
 
 .startButton:disabled {
@@ -213,8 +213,8 @@
 }
 
 .gameRules {
-  background: #fef3c7;
-  border-left: 4px solid #f59e0b;
+  background: #F8F0DD;
+  border-left: 4px solid #F1BD45;
   padding: 16px;
   border-radius: 8px;
 }
@@ -222,7 +222,7 @@
 .gameRules h4 {
   margin: 0 0 12px;
   font-size: 13px;
-  color: #92400e;
+  color: #8b6647;
   font-weight: 600;
 }
 
@@ -234,7 +234,7 @@
 
 .gameRules li {
   font-size: 12px;
-  color: #92400e;
+  color: #33552C;
   padding: 4px 0;
   padding-left: 20px;
   position: relative;

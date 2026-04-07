@@ -27,29 +27,11 @@ export const PairingQueue: React.FC<PairingQueueProps> = ({
   return (
     <div className={styles.container}>
       <div className={styles.content}>
-        <h2 className={styles.title}>Team Pairing</h2>
-        <p className={styles.subtitle}>Ready to compete?</p>
 
         <div className={styles.description}>
           <p>
-            Join the pairing queue to be matched with another team for competitive gameplay. Teams
-            compete against each other to achieve the best results in the game.
+            Press to match with another team! During the queue, you may review the documentation to prepare for the game.
           </p>
-        </div>
-
-        <div className={styles.features}>
-          <div className={styles.feature}>
-            <span className={styles.icon}>🎯</span>
-            <p>Competitive Pairing</p>
-          </div>
-          <div className={styles.feature}>
-            <span className={styles.icon}>🏆</span>
-            <p>Real-Time Competition</p>
-          </div>
-          <div className={styles.feature}>
-            <span className={styles.icon}>📊</span>
-            <p>Performance Tracking</p>
-          </div>
         </div>
 
         <button

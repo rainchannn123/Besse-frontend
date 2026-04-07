@@ -32,7 +32,7 @@ export const MRFInvent: React.FC<MRFInventProps> = ({
 
   const dumpOptions = ['Landfill', 'Landfill 2', 'Landfill 3'];
   const handleSelect = (value: string) => {
-    console.log('Selected option:', value);
+    // console.log('Selected option:', value);
   };
 
   const handleConfirm = () => {

@@ -1,6 +1,7 @@
 'use client';
 
 import MunicipalityCustomHeader from '@/components/layout/header/customheader/MunicipalityCustomHeader';
+import GameModeBadge from '@/components/ui/GameModeBadge';
 import { MaterialConstructAction } from '@/components/ui/materialConstructAction/MaterialConstructAction';
 import { MunicipalityMaterialSelectedBox } from '@/components/ui/selectedBox/MunicipalityMaterialSelectedBox';
 import { MunicipalityWasteSelectedBox } from '@/components/ui/selectedBox/MunicipalityWasteSelectedBox';
@@ -16,7 +17,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useNotificationStore } from '@/stores/notificationStore';
 import { CityProject, GameState, Material, WasteBatch } from '@/types/besse';
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export default function MunicipalityPage() {
   const { user } = useAuthStore();
@@ -40,6 +41,9 @@ export default function MunicipalityPage() {
   const [statistics, setStatistics] = useState<any | null>(null);
   const [countdownRemaining, setCountdownRemaining] = useState<number | null>(null);
   const [lastActionType, setLastActionType] = useState<string | null>(null);
+  const [gameMode] = useState<string | null>(() =>
+    typeof window !== 'undefined' ? localStorage.getItem('game_mode') : null
+  );
   const { getCurrentGameSession, notifications, isConnected, subscribe, joinGame, emit } = useWebSocket();
 
   const currentGameState = gameState;
@@ -118,19 +122,20 @@ export default function MunicipalityPage() {
   // throttle helper refs for applying full state
   const lastAppliedRef = useRef<number>(0);
   const pendingPayloadRef = useRef<any | null>(null);
+  const shiftStartTimeRef = useRef<number>(0);
 
   // Join the user's current session when websocket connects
   useEffect(() => {
     if (user?.currentSession && isConnected) {
-      console.log('Municipality page: Calling joinGame with sessionId:', user.currentSession);
+      // console.log('Municipality page: Calling joinGame with sessionId:', user.currentSession);
       joinGame(user.currentSession);
     } else {
-      console.log(
-        'Municipality page: Not joining yet - user.currentSession:',
-        user?.currentSession,
-        'isConnected:',
-        isConnected
-      );
+      // console.log(
+      //   'Municipality page: Not joining yet - user.currentSession:',
+      //   user?.currentSession,
+      //   'isConnected:',
+      //   isConnected
+      // );
     }
   }, [user?.currentSession, isConnected, joinGame]);
 
@@ -221,11 +226,11 @@ export default function MunicipalityPage() {
           const pendingBatches = data.gameState.wasteBatches.filter(
             (batch: WasteBatch) => batch.status === 'PENDING'
           );
-          console.log('[Municipality] Updating waste batches from real-time event:', {
-            total: data.gameState.wasteBatches.length,
-            pending: pendingBatches.length,
-            actionType: data?.actionType,
-          });
+          // console.log('[Municipality] Updating waste batches from real-time event:', {
+          //   total: data.gameState.wasteBatches.length,
+          //   pending: pendingBatches.length,
+          //   actionType: data?.actionType,
+          // });
           setWasteBatches(pendingBatches);
         }
       }
@@ -233,19 +238,19 @@ export default function MunicipalityPage() {
       // Handle specific actions based on actionType
       const actionType = data?.actionType;
       if (actionType === 'waste-collected' || actionType === 'waste-rejected') {
-        console.log(
-          '[Municipality] Waste action detected - batches already updated from gameState'
-        );
+        // console.log(
+        //   '[Municipality] Waste action detected - batches already updated from gameState'
+        // );
         // No need to call fetchWasteBatches() - already updated from gameState above
       } else if (actionType === 'project-constructed') {
-        console.log('[Municipality] Project constructed - refreshing projects');
+        // console.log('[Municipality] Project constructed - refreshing projects');
         fetchCityProjects();
       }
     });
 
     // COUNTDOWN EXPIRED EVENT
     const unsubCountdownExpired = subscribe('countdown-expired', (data: any) => {
-      console.log('Countdown expired received in Municipality page:', data);
+      // console.log('Countdown expired received in Municipality page:', data);
       // Update game state if provided
       if (data?.gameState) {
         setGameState(data.gameState);
@@ -269,7 +274,7 @@ export default function MunicipalityPage() {
 
     // COUNTDOWN STARTED EVENT
     const unsubCountdownStarted = subscribe('countdown-started', (data: any) => {
-      console.log('Countdown started received in Municipality page:', data);
+      // console.log('Countdown started received in Municipality page:', data);
       // Update game state if provided to start the countdown
       if (data?.gameState) {
         setGameState(data.gameState);
@@ -278,7 +283,7 @@ export default function MunicipalityPage() {
 
     // COUNTDOWN CANCELLED EVENT
     const unsubCountdownCancelled = subscribe('countdown-cancelled', (data: any) => {
-      console.log('Countdown cancelled received in Municipality page:', data);
+      // console.log('Countdown cancelled received in Municipality page:', data);
       // Update game state if provided to clear the countdown
       if (data?.gameState) {
         setGameState(data.gameState);
@@ -287,23 +292,19 @@ export default function MunicipalityPage() {
 
     // Player actions for live log
     const unsubPlayerAction = subscribe('player-action', (data: any) => {
-      const time = data?.timestamp
-        ? new Date(data.timestamp).toLocaleTimeString('en-US', {
-            hour12: false,
-          })
-        : new Date().toLocaleTimeString('en-US', { hour12: false });
+      const time = getCountdownTime();
       const message = data?.playerName
         ? `${data.playerName} ${data.action || ''}`
         : JSON.stringify(data);
-      setLiveLogItems((prev) => [{ time, message, isLive: true }, ...prev].slice(0, 100));
+      setLiveLogItems((prev) => [...prev, { time, message, isLive: true }].slice(-100));
     });
 
-    // System messages for live log
-    const unsubSystemMessage = subscribe('system-message', (data: any) => {
-      const time = new Date().toLocaleTimeString('en-US', { hour12: false });
-      setLiveLogItems((prev) =>
-        [{ time, message: data.message, isLive: true, type: data.type }, ...prev].slice(0, 100)
-      );
+    // TEMPORARILY COMMENTED OUT - system messages for live log
+    const unsubSystemMessage = subscribe('system-message', (_data: any) => {
+      // const time = getCountdownTime();
+      // setLiveLogItems((prev) =>
+      //   [...prev, { time, message: data.message, isLive: true, type: data.type }].slice(-100)
+      // );
     });
 
     const unsubAuctionsResolved = subscribe('auctions-resolved', (data: any) => {
@@ -342,13 +343,30 @@ export default function MunicipalityPage() {
     };
   }, [subscribe, router, fetchWasteBatches, fetchCityProjects]);
 
-  const staticLogData =
-    currentGameState?.activityLog?.map((log, index) => ({
-      time: `[${String(currentGameState.currentGameHour).padStart(2, '0')}:${String(
-        (index * 15) % 60
-      ).padStart(2, '0')}]`,
-      message: log,
-    })) || [];
+  // Compute countdown-style timestamps for static logs
+  const getDurationMinutes = () => {
+    const c = currentGameState?.constants as any;
+    if (c?.REAL_TIME_GAME_DURATION_MINUTES) return c.REAL_TIME_GAME_DURATION_MINUTES;
+    try {
+      const stored = localStorage.getItem('init_state');
+      if (stored) { const p = JSON.parse(stored); if (p?.constants?.REAL_TIME_GAME_DURATION_MINUTES) return p.constants.REAL_TIME_GAME_DURATION_MINUTES; }
+    } catch {}
+    return 15;
+  };
+  const totalDurMin = getDurationMinutes();
+  // TEMPORARILY COMMENTED OUT - static activity log messages
+  // const staticLogData =
+  //   currentGameState?.activityLog?.map((log, index) => {
+  //     const elapsedMin = ((index + 1) / (currentGameState.activityLog?.length || 1)) * (currentGameState.minutesElapsed || 0);
+  //     const remainMin = Math.max(0, totalDurMin - elapsedMin);
+  //     const remMins = Math.floor(remainMin);
+  //     const remSecs = Math.floor((remainMin - remMins) * 60);
+  //     return {
+  //       time: `[${String(remMins).padStart(2, '0')}:${String(remSecs).padStart(2, '0')}]`,
+  //       message: log,
+  //     };
+  //   })?.reverse() || [];
+  const staticLogData: { time: string; message: string }[] = [];
 
   // Use authoritative state from `fullPayload` when available
   const authoritativeState = fullPayload?.gameState ?? currentGameState;
@@ -369,9 +387,8 @@ export default function MunicipalityPage() {
         }))
     : [];
 
-  // For formatted logs, always use staticLogData which is properly formatted with time+message
-  // Merge live websocket logs (newest first) with the static activity log
-  const logData = [...staticLogData];
+  // For formatted logs, merge static activity log with live websocket logs
+  const logData = [...staticLogData, ...liveLogItems];
 
   // Derived UI: combine summaries for display
   const turn = turnSummary || null;
@@ -384,6 +401,33 @@ export default function MunicipalityPage() {
   const shiftStartTime = authoritativeState
     ? Date.now() - (authoritativeState.minutesElapsed || 0) * 60 * 1000
     : 0;
+
+  // Keep ref in sync for use in websocket callbacks (avoids re-subscription)
+  useEffect(() => {
+    shiftStartTimeRef.current = typeof shiftStartTime === 'number' ? shiftStartTime : 0;
+  }, [shiftStartTime]);
+
+  const getCountdownTime = useCallback(() => {
+    const st = shiftStartTimeRef.current;
+    if (!st) return '[--:--]';
+    const elapsed = Math.max(0, Date.now() - new Date(st).getTime());
+    let durationMin = 15;
+    try {
+      const stored = localStorage.getItem('init_state');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed?.constants?.REAL_TIME_GAME_DURATION_MINUTES) durationMin = parsed.constants.REAL_TIME_GAME_DURATION_MINUTES;
+      }
+    } catch {}
+    const remainingMs = Math.max(0, durationMin * 60 * 1000 - elapsed);
+    const mins = Math.floor(remainingMs / 60000);
+    const secs = Math.floor((remainingMs % 60000) / 1000);
+    return `[${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}]`;
+  }, []);
+
+  const handleStatusLog = useCallback((log: { time: string; message: string; isLive?: boolean; type?: 'info' | 'warning' | 'error' }) => {
+    setLiveLogItems((prev) => [...prev, log].slice(-100));
+  }, []);
 
   if (loading) {
     return (
@@ -541,6 +585,12 @@ export default function MunicipalityPage() {
               shiftStart={shiftStart}
               shiftStartTime={authoritativeState?.gameStartTime}
               gameOverCountdown={authoritativeState?.gameOverCountdown}
+              onGameOver={() => router.push('/dashboard/game-over')}
+              cityHealth={authoritativeState?.cityHealth}
+              budget={authoritativeState?.budget}
+              totalCO2={authoritativeState?.totalCO2}
+              wasteInventory={authoritativeState?.wasteInventory}
+              onStatusLog={handleStatusLog}
             />
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -554,6 +604,7 @@ export default function MunicipalityPage() {
                   backgroundImage={woodenHead.src}
                   title={authoritativeState?.teamRole || currentGameState?.teamRole}
                 />
+                <GameModeBadge gameMode={gameMode} />
                 {/* Tab Navigation */}
                 <div className="flex justify-center mb-4">
                   <div className="bg-white rounded-lg p-1 shadow-md">

@@ -41,7 +41,7 @@ export const usePairingSystem = (
 
   // Join pairing queue
   const joinPairingQueue = useCallback(async () => {
-    console.log("Joining pairing queue with sessionId:", sessionId);
+    // console.log("Joining pairing queue with sessionId:", sessionId);
     if (!sessionId) {
       addNotification("Session ID not found", "error");
       return false;
@@ -206,7 +206,7 @@ export const usePairingSystem = (
           return result;
         } else {
           // No pairing data yet, remain in queue or unpaired state
-          console.log("No pairing result available yet");
+          // console.log("No pairing result available yet");
           return null;
         }
       }
@@ -218,7 +218,7 @@ export const usePairingSystem = (
   // Stable event handlers using useCallback
   const handlePairingJoined = useCallback(
     (data: any) => {
-      console.log("[usePairingSystem] handlePairingJoined:", data);
+      // console.log("[usePairingSystem] handlePairingJoined:", data);
       setPairingStatus({
         isInQueue: true,
         position: data.position ?? 1,
@@ -242,7 +242,7 @@ export const usePairingSystem = (
 
   const handlePairingStatusUpdate = useCallback(
     (data: any) => {
-      console.log("[usePairingSystem] handlePairingStatusUpdate:", data);
+      // console.log("[usePairingSystem] handlePairingStatusUpdate:", data);
       if (data.status) {
         updatePairingStatus(data.status);
       }
@@ -252,18 +252,18 @@ export const usePairingSystem = (
 
   const handleTeamsPaired = useCallback(
     (data: any) => {
-      console.log(
-        "[usePairingSystem] ⭐⭐⭐ TEAMS PAIRED EVENT RECEIVED ⭐⭐⭐"
-      );
-      console.log(
-        "[usePairingSystem] Event data:",
-        JSON.stringify(data, null, 2)
-      );
-      console.log("[usePairingSystem] Setting paired status with:", {
-        pairId: data.pairId,
-        partnerSessionId: data.partnerSessionId,
-        teamRole: data.teamRole,
-      });
+      // console.log(
+      //   "[usePairingSystem] ⭐⭐⭐ TEAMS PAIRED EVENT RECEIVED ⭐⭐⭐"
+      // );
+      // console.log(
+      //   "[usePairingSystem] Event data:",
+      //   JSON.stringify(data, null, 2)
+      // );
+      // console.log("[usePairingSystem] Setting paired status with:", {
+      //   pairId: data.pairId,
+      //   partnerSessionId: data.partnerSessionId,
+      //   teamRole: data.teamRole,
+      // });
 
       setPairingStatus({
         isInQueue: false,
@@ -295,7 +295,7 @@ export const usePairingSystem = (
 
   const handlePartnerEliminated = useCallback(
     (data: any) => {
-      console.log("[usePairingSystem] handlePartnerEliminated:", data);
+      // console.log("[usePairingSystem] handlePartnerEliminated:", data);
       updatePairingStatus({
         pairStatus: "team_a_eliminated" as any,
       });
@@ -308,7 +308,7 @@ export const usePairingSystem = (
   );
 
   const handlePairingLeft = useCallback(() => {
-    console.log("[usePairingSystem] handlePairingLeft");
+    // console.log("[usePairingSystem] handlePairingLeft");
     setPairingStatus(null);
     addNotification("Left pairing queue", "info");
   }, [setPairingStatus, addNotification]);
@@ -317,10 +317,10 @@ export const usePairingSystem = (
   useEffect(() => {
     if (!enabled || !sessionId) return;
 
-    console.log(
-      "[usePairingSystem] Setting up WebSocket event listeners for sessionId:",
-      sessionId
-    );
+    // console.log(
+    //   "[usePairingSystem] Setting up WebSocket event listeners for sessionId:",
+    //   sessionId
+    // );
 
     socketManager.on("pairing-joined", handlePairingJoined);
     socketManager.on("pairing-status-update", handlePairingStatusUpdate);
@@ -330,10 +330,10 @@ export const usePairingSystem = (
     socketManager.on("game-state-full", handleGameStateFull);
 
     return () => {
-      console.log(
-        "[usePairingSystem] Cleaning up WebSocket event listeners for sessionId:",
-        sessionId
-      );
+      // console.log(
+      //   "[usePairingSystem] Cleaning up WebSocket event listeners for sessionId:",
+      //   sessionId
+      // );
       socketManager.off("pairing-joined", handlePairingJoined);
       socketManager.off("pairing-status-update", handlePairingStatusUpdate);
       socketManager.off("teams-paired", handleTeamsPaired);
@@ -377,7 +377,7 @@ export const usePairingSystem = (
       // Also check if pairing is complete
       const result = await getPairingResult();
       if (result) {
-        console.log("Pairing complete detected via polling:", result);
+        // console.log("Pairing complete detected via polling:", result);
       }
     }, 3000); // Changed from 20000ms to 3000ms for faster detection
 

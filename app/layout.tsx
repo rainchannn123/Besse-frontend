@@ -33,7 +33,7 @@ const righteous = Righteous({
 export const metadata: Metadata = {
   title: 'Besse',
   description:
-    'Blockchain-enabled ecosystem for sustainable waste management and recycling operations.',
+    'exciting game for sustainable waste management and recycling operations.',
 };
 
 export default function RootLayout({

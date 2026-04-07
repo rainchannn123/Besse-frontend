@@ -108,12 +108,6 @@ export default function AdminMonitorPage() {
   }, [overview, search, statusFilter]);
 
   const handleForceExit = async (player: AdminPlayerRow) => {
-    const confirmed = window.confirm(
-      `Force ${player.name} out of current game session? This will set their session to out-of-game.`
-    );
-
-    if (!confirmed) return;
-
     try {
       setActionLoadingUserId(player.userId);
       await adminService.forceExitPlayer(
@@ -318,6 +312,7 @@ export default function AdminMonitorPage() {
                     <td className="px-3 py-3 align-top text-sm text-[#4f2d14]">
                       <p>Role: {player.roleInSession || '-'}</p>
                       <p>Team: {player.teamRole || '-'}</p>
+                      <p>Mode: {player.gameMode ? player.gameMode.charAt(0).toUpperCase() + player.gameMode.slice(1) : '-'}</p>
                     </td>
                     <td className="px-3 py-3 align-top text-sm text-[#4f2d14]">
                       <p>{player.currentSession || '-'}</p>
@@ -466,7 +461,7 @@ export default function AdminMonitorPage() {
                           {team.teamRole || 'Unassigned Team'} | Session {team.sessionId}
                         </p>
                         <p className="text-xs text-[#6d4b2a] mt-1">
-                          Leader: {team.leaderName} | Lobby Code: {team.lobbyCode}
+                          Leader: {team.leaderName} | Lobby Code: {team.lobbyCode} | Mode: {team.gameMode ? team.gameMode.charAt(0).toUpperCase() + team.gameMode.slice(1) : '-'}
                         </p>
                         <p className="text-xs text-[#6d4b2a]">
                           Stage: {team.stage} | Status: {team.status}

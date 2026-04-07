@@ -1,6 +1,7 @@
 'use client';
 
 import CustomHeader from '@/components/layout/header/customheader/CustomHeader';
+import GameModeBadge from '@/components/ui/GameModeBadge';
 import { useGameWebSocket } from '@/hooks/useWebSocket';
 import sideArrow from '@/public/assets/images/sideArrow.png';
 import woodenBg from '@/public/assets/images/wooden_bg.png';
@@ -61,6 +62,10 @@ export default function TeamMembersPage() {
     setMaxPlayers(nextLobbyState.maxPlayers);
     setSubtitle(`${nextLobbyState.maxPlayers} Players are needed to start playing the game`);
 
+    if (nextLobbyState.gameMode) {
+      localStorage.setItem('game_mode', nextLobbyState.gameMode);
+    }
+
     const mappedMembers: Member[] = nextLobbyState.players.map((player: any) => ({
       id: player.userId,
       name: player.name,
@@ -119,7 +124,7 @@ export default function TeamMembersPage() {
 
       setError('');
       const response = await lobbyService.getLobbyState(userData.currentSession);
-      console.log('Lobby State Response:', response);
+      // console.log('Lobby State Response:', response);
 
       if (response.data?.lobbyState) {
         const lobbyState = response.data.lobbyState;
@@ -281,7 +286,7 @@ export default function TeamMembersPage() {
     });
 
     const unSubcribeGameStarted = subscribe('game-started', (data: any) => {
-      console.log('Game started event received in role page:', data);
+      // console.log('Game started event received in role page:', data);
       if (data?.sessionId === user?.currentSession) {
         const players = extractPlayers(data);
         const currentPlayer = players.find((player: any) => player.userId === user._id);
@@ -299,7 +304,7 @@ export default function TeamMembersPage() {
     });
 
     const unsubLobbyActivated = subscribe('lobby-activated', (data: any) => {
-      console.log('Lobby activated event received: in role page', data);
+      // console.log('Lobby activated event received: in role page', data);
 
       if (data?.lobby?.status === 'active') {
         // For lobby-activated event, the structure might be different
@@ -434,6 +439,7 @@ export default function TeamMembersPage() {
           subtitle={subtitle}
           lobbyCode={lobbyCode}
         />
+        <GameModeBadge gameMode={lobbyState?.gameMode} />
         <div className="flex-1 space-y-2 bg-center flex flex-col justify-between">
           <div className="grid lg:grid-cols-3 md:grid-cols-2 grid-cols-1 gap-6 md:px-8 px-4 pt-6 w-full flex-1">
             {members.map((m) => {

@@ -20,11 +20,11 @@ export const useGameOverCountdown = (
   }, [onGameOver]);
 
   useEffect(() => {
-    const updateCountdown = () => {
+    const checkAndUpdate = () => {
       if (gameOverCountdown?.active && gameOverCountdown.startTime) {
         const now = Date.now();
         const startTime = gameOverCountdown.startTime;
-        const gameOverDurationMs = 3 * 60 * 1000; // 3 minutes
+        const gameOverDurationMs = 30 * 1000; // 30 seconds
         const targetTime = startTime + gameOverDurationMs;
         const remaining = Math.max(0, targetTime - now);
 
@@ -47,9 +47,22 @@ export const useGameOverCountdown = (
       }
     };
 
-    updateCountdown();
-    const timer = setInterval(updateCountdown, 1000);
-    return () => clearInterval(timer);
+    checkAndUpdate();
+    const timer = setInterval(checkAndUpdate, 1000);
+
+    // When the tab regains focus, immediately re-check in case
+    // the interval was throttled while the tab was in the background
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        checkAndUpdate();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [gameOverCountdown]);
 
   return gameOverDisplay;

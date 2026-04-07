@@ -1,6 +1,7 @@
 'use client';
 
 import MunicipalityCustomHeader from '@/components/layout/header/customheader/MunicipalityCustomHeader';
+import GameModeBadge from '@/components/ui/GameModeBadge';
 import { MRFCollect } from '@/components/ui/MRFCollect/MRFCollect';
 import { PendingAuctionAction } from '@/components/ui/pendingAuctionAction/PendingAuctionAction';
 import { MRFCollectionSelectedBox } from '@/components/ui/selectedBox/MRFCollectionSelectedBox';
@@ -19,7 +20,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useNotificationStore } from '@/stores/notificationStore';
 import { GameState, Material, WasteBatch } from '@/types/besse';
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export default function MRFCollectionPage() {
   const { user } = useAuthStore();
@@ -41,9 +42,12 @@ export default function MRFCollectionPage() {
   const [statistics, setStatistics] = useState<any | null>(null);
   const [countdownRemaining, setCountdownRemaining] = useState<number | null>(null);
   const [lastActionType, setLastActionType] = useState<string | null>(null);
+  const [gameMode] = useState<string | null>(() =>
+    typeof window !== 'undefined' ? localStorage.getItem('game_mode') : null
+  );
   const { getCurrentGameSession, notifications, isConnected, subscribe, joinGame, emit } = useWebSocket();
 
-  console.log({ currentGame: getCurrentGameSession(), notifications });
+  // console.log({ currentGame: getCurrentGameSession(), notifications });
 
   const currentGameState = gameState;
   const fetchGameState = async () => {
@@ -97,7 +101,7 @@ export default function MRFCollectionPage() {
         const notListInventory = response.data.inventory.filter(
           (item) => item.owner === 'mrf' && !item.listed
         );
-        console.log('Fetched MRF Inventory:', notListInventory);
+        // console.log('Fetched MRF Inventory:', notListInventory);
         setInventory(notListInventory);
       }
     } catch (err: any) {
@@ -150,19 +154,20 @@ export default function MRFCollectionPage() {
   // throttle helper refs for applying full state
   const lastAppliedRef = useRef<number>(0);
   const pendingPayloadRef = useRef<any | null>(null);
+  const shiftStartTimeRef = useRef<number>(0);
 
   // Join the user's current session when websocket connects
   useEffect(() => {
     if (user?.currentSession && isConnected) {
-      console.log('MRF Collection page: Calling joinGame with sessionId:', user.currentSession);
+      // console.log('MRF Collection page: Calling joinGame with sessionId:', user.currentSession);
       joinGame(user.currentSession);
     } else {
-      console.log(
-        'MRF Collection page: Not joining yet - user.currentSession:',
-        user?.currentSession,
-        'isConnected:',
-        isConnected
-      );
+      // console.log(
+      //   'MRF Collection page: Not joining yet - user.currentSession:',
+      //   user?.currentSession,
+      //   'isConnected:',
+      //   isConnected
+      // );
     }
   }, [user?.currentSession, isConnected, joinGame]);
 
@@ -229,28 +234,28 @@ export default function MRFCollectionPage() {
       // Handle specific actions based on actionType
       const actionType = data?.actionType;
       if (actionType === 'waste-collected') {
-        console.log('[MRF Collection] Waste collected - refreshing queue and inventory');
+        // console.log('[MRF Collection] Waste collected - refreshing queue and inventory');
         fetchQueue();
       } else if (actionType === 'waste-processed') {
-        console.log('[MRF Collection] Waste processed - refreshing queue and inventory');
+        // console.log('[MRF Collection] Waste processed - refreshing queue and inventory');
         fetchQueue();
         fetchPendingAuctions();
       } else if (actionType === 'material-graded') {
-        console.log('[MRF Collection] Material graded - refreshing inventory and auctions');
+        // console.log('[MRF Collection] Material graded - refreshing inventory and auctions');
 
         fetchPendingAuctions();
       } else if (actionType === 'material-sold-external' || actionType === 'material-transferred') {
-        console.log(`[MRF Collection] ${actionType} - refreshing inventory`);
+        // console.log(`[MRF Collection] ${actionType} - refreshing inventory`);
         fetchInventory();
       } else if (actionType === 'auction-updated') {
-        console.log('[MRF Collection] Auction updated - refreshing pending auctions');
+        // console.log('[MRF Collection] Auction updated - refreshing pending auctions');
         fetchPendingAuctions();
       }
     });
 
     // COUNTDOWN EXPIRED EVENT - ADDED
     const unsubCountdownExpired = subscribe('countdown-expired', (data: any) => {
-      console.log('Countdown expired received in MRF page:', data);
+      // console.log('Countdown expired received in MRF page:', data);
 
       // Update game state if provided
       if (data?.gameState) {
@@ -276,7 +281,7 @@ export default function MRFCollectionPage() {
 
     // COUNTDOWN STARTED EVENT - ADDED
     const unsubCountdownStarted = subscribe('countdown-started', (data: any) => {
-      console.log('Countdown started received in MRF page:', data);
+      // console.log('Countdown started received in MRF page:', data);
       // Update game state if provided to start the countdown
       if (data?.gameState) {
         setGameState(data.gameState);
@@ -285,7 +290,7 @@ export default function MRFCollectionPage() {
 
     // COUNTDOWN CANCELLED EVENT - ADDED
     const unsubCountdownCancelled = subscribe('countdown-cancelled', (data: any) => {
-      console.log('Countdown cancelled received in MRF page:', data);
+      // console.log('Countdown cancelled received in MRF page:', data);
       // Update game state if provided to clear the countdown
       if (data?.gameState) {
         setGameState(data.gameState);
@@ -294,23 +299,33 @@ export default function MRFCollectionPage() {
 
     // Player actions for live log
     const unsubPlayerAction = subscribe('player-action', (data: any) => {
-      const time = data?.timestamp
-        ? new Date(data.timestamp).toLocaleTimeString('en-US', {
-            hour12: false,
-          })
-        : new Date().toLocaleTimeString('en-US', { hour12: false });
+      const st = shiftStartTimeRef.current;
+      const elapsed = st ? Math.max(0, Date.now() - new Date(st).getTime()) : 0;
+      let durationMin = 15;
+      try { const stored = localStorage.getItem('init_state'); if (stored) { const p = JSON.parse(stored); if (p?.constants?.REAL_TIME_GAME_DURATION_MINUTES) durationMin = p.constants.REAL_TIME_GAME_DURATION_MINUTES; } } catch {}
+      const remainingMs = Math.max(0, durationMin * 60 * 1000 - elapsed);
+      const mins = Math.floor(remainingMs / 60000);
+      const secs = Math.floor((remainingMs % 60000) / 1000);
+      const time = `[${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}]`;
       const message = data?.playerName
         ? `${data.playerName} ${data.action || ''}`
         : JSON.stringify(data);
-      setLiveLogItems((prev) => [{ time, message, isLive: true }, ...prev].slice(0, 100));
+      setLiveLogItems((prev) => [...prev, { time, message, isLive: true }].slice(-100));
     });
 
-    // System messages for live log
-    const unsubSystemMessage = subscribe('system-message', (data: any) => {
-      const time = new Date().toLocaleTimeString('en-US', { hour12: false });
-      setLiveLogItems((prev) =>
-        [{ time, message: data.message, isLive: true, type: data.type }, ...prev].slice(0, 100)
-      );
+    // TEMPORARILY COMMENTED OUT - system messages for live log
+    const unsubSystemMessage = subscribe('system-message', (_data: any) => {
+      // const st = shiftStartTimeRef.current;
+      // const elapsed = st ? Math.max(0, Date.now() - new Date(st).getTime()) : 0;
+      // let durationMin = 15;
+      // try { const stored = localStorage.getItem('init_state'); if (stored) { const p = JSON.parse(stored); if (p?.constants?.REAL_TIME_GAME_DURATION_MINUTES) durationMin = p.constants.REAL_TIME_GAME_DURATION_MINUTES; } } catch {}
+      // const remainingMs = Math.max(0, durationMin * 60 * 1000 - elapsed);
+      // const mins = Math.floor(remainingMs / 60000);
+      // const secs = Math.floor((remainingMs % 60000) / 1000);
+      // const time = `[${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}]`;
+      // setLiveLogItems((prev) =>
+      //   [...prev, { time, message: data.message, isLive: true, type: data.type }].slice(-100)
+      // );
     });
 
     const unsubSurrenderUpdate = subscribe('surrender-update', (data: any) => {
@@ -334,20 +349,36 @@ export default function MRFCollectionPage() {
     };
   }, [subscribe, router, fetchQueue, fetchInventory, fetchPendingAuctions]);
 
-  const staticLogData =
-    currentGameState?.activityLog?.map((log, index) => ({
-      time: `[${String(currentGameState.currentGameHour).padStart(2, '0')}:${String(
-        (index * 15) % 60
-      ).padStart(2, '0')}]`,
-      message: log,
-    })) || [];
+  // Compute countdown-style timestamps for static logs
+  const getDurationMinutes = () => {
+    const c = currentGameState?.constants as any;
+    if (c?.REAL_TIME_GAME_DURATION_MINUTES) return c.REAL_TIME_GAME_DURATION_MINUTES;
+    try {
+      const stored = localStorage.getItem('init_state');
+      if (stored) { const p = JSON.parse(stored); if (p?.constants?.REAL_TIME_GAME_DURATION_MINUTES) return p.constants.REAL_TIME_GAME_DURATION_MINUTES; }
+    } catch {}
+    return 15;
+  };
+  const totalDurMin = getDurationMinutes();
+  // TEMPORARILY COMMENTED OUT - static activity log messages
+  // const staticLogData =
+  //   currentGameState?.activityLog?.map((log, index) => {
+  //     const elapsedMin = ((index + 1) / (currentGameState.activityLog?.length || 1)) * (currentGameState.minutesElapsed || 0);
+  //     const remainMin = Math.max(0, totalDurMin - elapsedMin);
+  //     const remMins = Math.floor(remainMin);
+  //     const remSecs = Math.floor((remainMin - remMins) * 60);
+  //     return {
+  //       time: `[${String(remMins).padStart(2, '0')}:${String(remSecs).padStart(2, '0')}]`,
+  //       message: log,
+  //     };
+  //   })?.reverse() || [];
+  const staticLogData: { time: string; message: string }[] = [];
 
   // Use authoritative state from `fullPayload` when available
   const authoritativeState = fullPayload?.gameState ?? currentGameState;
 
-  // For formatted logs, always use staticLogData which is properly formatted with time+message
-  // Merge live websocket logs (newest first) with the static activity log
-  const logData = [...staticLogData];
+  // For formatted logs, merge static activity log with live websocket logs
+  const logData = [...staticLogData, ...liveLogItems];
 
   // Derived UI: combine summaries for display
   const stats =
@@ -363,6 +394,15 @@ export default function MRFCollectionPage() {
   const shiftStartTime = authoritativeState
     ? Date.now() - (authoritativeState.minutesElapsed || 0) * 60 * 1000
     : 0;
+
+  // Keep ref in sync for use in websocket callbacks
+  useEffect(() => {
+    shiftStartTimeRef.current = typeof shiftStartTime === 'number' ? shiftStartTime : 0;
+  }, [shiftStartTime]);
+
+  const handleStatusLog = useCallback((log: { time: string; message: string; isLive?: boolean; type?: 'info' | 'warning' | 'error' }) => {
+    setLiveLogItems((prev) => [...prev, log].slice(-100));
+  }, []);
 
   // Filter waste batches that are in the MRF queue
   const availableBatches = ((gameState as any)?.wasteBatches || []).filter((batch: WasteBatch) =>
@@ -486,7 +526,7 @@ export default function MRFCollectionPage() {
       });
     }
   };
-  console.log(gameState);
+  // console.log(gameState);
   return (
     <div>
       <div className="bg-[#f3e9da] min-h-screen">
@@ -497,6 +537,12 @@ export default function MRFCollectionPage() {
               shiftStart={shiftStart}
               shiftStartTime={authoritativeState?.gameStartTime}
               gameOverCountdown={authoritativeState?.gameOverCountdown}
+              onGameOver={() => router.push('/dashboard/game-over')}
+              cityHealth={authoritativeState?.cityHealth}
+              budget={authoritativeState?.budget}
+              totalCO2={authoritativeState?.totalCO2}
+              wasteInventory={authoritativeState?.wasteInventory}
+              onStatusLog={handleStatusLog}
             />
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -510,6 +556,7 @@ export default function MRFCollectionPage() {
                   backgroundImage={woodenHead.src}
                   title={authoritativeState?.teamRole || currentGameState?.teamRole}
                 />
+                <GameModeBadge gameMode={gameMode} />
                 {/* Tab Navigation */}
                 <div className="flex justify-center mb-4">
                   <div className="bg-white rounded-lg p-1 shadow-md">

@@ -78,7 +78,7 @@ class SocketManager {
 
   connect(): void {
     if (this.socket?.connected) {
-      console.log('Socket already connected');
+      // console.log('Socket already connected');
       return;
     }
 
@@ -99,7 +99,7 @@ class SocketManager {
       return;
     }
 
-    console.log('Attempting to connect to socket:', socketUrl);
+    // console.log('Attempting to connect to socket:', socketUrl);
 
     this.socket = io(socketUrl, {
       auth: {
@@ -183,15 +183,15 @@ class SocketManager {
   joinGame(sessionId: string): void {
     this.currentGameSession = sessionId;
     this.persistGameSession(sessionId);
-    console.log(
-      '[SocketManager] joinGame called:',
-      'sessionId:',
-      sessionId,
-      'socket connected:',
-      this.socket?.connected,
-      'socket exists:',
-      !!this.socket
-    );
+    // console.log(
+    //   '[SocketManager] joinGame called:',
+    //   'sessionId:',
+    //   sessionId,
+    //   'socket connected:',
+    //   this.socket?.connected,
+    //   'socket exists:',
+    //   !!this.socket
+    // );
 
     if (!this.socket?.connected) {
       console.warn(
@@ -205,7 +205,7 @@ class SocketManager {
       return;
     }
 
-    console.log('[SocketManager] EMITTING join-game event for sessionId:', sessionId);
+    // console.log('[SocketManager] EMITTING join-game event for sessionId:', sessionId);
     this.socket.emit('join-game', { sessionId });
     this.lastJoinedSession = sessionId;
     this.lastJoinedSocketId = socketId;
@@ -259,14 +259,14 @@ class SocketManager {
     if (sessionId) {
       try {
         localStorage.setItem('current_game_session', sessionId);
-        console.log('Persisted game session to localStorage:', sessionId);
+        // console.log('Persisted game session to localStorage:', sessionId);
       } catch (e) {
         console.warn('Failed to persist game session to localStorage:', e);
       }
     } else {
       try {
         localStorage.removeItem('current_game_session');
-        console.log('Cleared game session from localStorage');
+        // console.log('Cleared game session from localStorage');
       } catch (e) {
         console.warn('Failed to clear game session from localStorage:', e);
       }
@@ -281,7 +281,7 @@ class SocketManager {
       const sessionId = localStorage.getItem('current_game_session');
       if (sessionId) {
         this.currentGameSession = sessionId;
-        console.log('Restored game session from localStorage:', sessionId);
+        // console.log('Restored game session from localStorage:', sessionId);
       }
     } catch (e) {
       console.warn('Failed to restore game session from localStorage:', e);
@@ -293,7 +293,7 @@ class SocketManager {
 
     // Connection events
     this.socket.on('connect', () => {
-      console.log('[SocketManager] WebSocket CONNECTED, socket id:', this.socket?.id);
+      // console.log('[SocketManager] WebSocket CONNECTED, socket id:', this.socket?.id);
       this.reconnectAttempts = 0; // Reset counter on successful connect
       this.emitEvent('connected');
 
@@ -305,7 +305,7 @@ class SocketManager {
 
       // Re-join game if we were in one before disconnect or page reload
       if (this.currentGameSession) {
-        console.log('[SocketManager] AUTO-REJOINING game session:', this.currentGameSession);
+        // console.log('[SocketManager] AUTO-REJOINING game session:', this.currentGameSession);
         // Use setTimeout to ensure the connection is fully established
         setTimeout(() => {
           if (this.currentGameSession) {
@@ -313,12 +313,12 @@ class SocketManager {
           }
         }, 100);
       } else {
-        console.log('[SocketManager] No currentGameSession to rejoin');
+        // console.log('[SocketManager] No currentGameSession to rejoin');
       }
     });
 
     this.socket.on('disconnect', (reason: any) => {
-      console.log('WebSocket disconnected:', reason);
+      // console.log('WebSocket disconnected:', reason);
       this.lastJoinedSession = null;
       this.lastJoinedSocketId = null;
       this.emitEvent('disconnected');
@@ -332,7 +332,7 @@ class SocketManager {
     });
 
     this.socket.on('reconnect_attempt', (attempt: any) => {
-      console.log(`WebSocket reconnect attempt ${attempt}`);
+      // console.log(`WebSocket reconnect attempt ${attempt}`);
     });
 
     this.socket.on('reconnect_failed', () => {
@@ -352,7 +352,7 @@ class SocketManager {
     this.socket.onAny((event: string, ...args: any[]) => {
       try {
         const payload = args.length === 1 ? args[0] : args;
-        console.log(`[SocketManager] Received event: '${event}'`, payload);
+        // console.log(`[SocketManager] Received event: '${event}'`, payload);
         this.emitEvent(event as GameEvent, payload);
       } catch (err) {
         console.error('Error forwarding event', event, err);
@@ -454,7 +454,7 @@ class SocketManager {
 
   private handleReconnect(): void {
     // Socket.io has built-in reconnection now, so we just log attempts
-    console.log(`Reconnect attempts: ${this.reconnectAttempts}/${this.maxReconnectAttempts}`);
+    // console.log(`Reconnect attempts: ${this.reconnectAttempts}/${this.maxReconnectAttempts}`);
   }
 }
 

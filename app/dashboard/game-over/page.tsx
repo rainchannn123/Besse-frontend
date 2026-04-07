@@ -4,6 +4,9 @@ import { useGameWebSocket } from '@/hooks/useWebSocket';
 import blueNote from '@/public/assets/images/blueNote.png';
 import cross from '@/public/assets/images/cross.png';
 import dollar from '@/public/assets/images/dollar.png';
+import health from '@/public/assets/images/health.png';
+import co2e from '@/public/assets/images/co2e.png';
+import transport from '@/public/assets/images/transport.png';
 import sideArrow from '@/public/assets/images/sideArrow.png';
 import woodenBg from '@/public/assets/images/wooden_bg.png';
 import { gameService } from '@/services/gameService';
@@ -66,7 +69,7 @@ export default function page() {
     try {
       const response = await gameService.getPairDetails(pairId);
       if (response.success && response.data) {
-        console.log('Pair Details:', response.data);
+        // console.log('Pair Details:', response.data);
         setPairDetails(response.data.pairDetails);
       }
     } catch (err: any) {
@@ -168,7 +171,7 @@ export default function page() {
     }
     const isWin = gameState?.gameStatus === 'won';
     return {
-      title: isWin ? 'Congratulations! You Won!' : 'You are bankrupt!',
+      title: isWin ? 'Congratulations! You Won!' : 'You Lost',
       subtitle: '',
       isWin,
     };
@@ -213,66 +216,54 @@ export default function page() {
                 <div className="bg-white h-full w-full md:p-18 sm:p-10 p-6">
                   <div className="border border-black rounded-[10px]">
                     <div className="flex gap-8 justify-center border-b border-black py-2">
-                      <Image src={blueNote} alt="blueNote" />
+                      {/* <Image src={blueNote} alt="blueNote" /> */}
                       <p className="flex items-center  font-bold font-roboto md:text-[28px] text-[22px] text-black ">
-                        Outcome
+                        Game Summary
                       </p>
                     </div>
-                    <div className="grid sm:grid-cols-2 grid-cols-1 ">
-                      <div className="px-4  py-4">
-                        <h4 className="font-roboto font-bold md:text-[28px] text-[22px] text-black">
-                          Your Metric
-                        </h4>
-                        <div className="px-6 py-4">
-                          <div className="flex gap-3 pb-4">
-                            <div className="flex items-center">
-                              <Image src={dollar} alt="dollar" />
-                            </div>
-                            <p className="flex items-center  font-bold font-roboto md:text-[25px]  text-[20px] text-black ">
+                    <div className="px-4 py-4">
+                      <div className="px-6 py-4 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex gap-3 items-center">
+                            <Image src={dollar} alt="dollar" width={28} height={28} className="w-7 h-7 object-contain" />
+                            <p className="font-bold font-roboto md:text-[25px] text-[15px] text-black">
                               Cash
                             </p>
                           </div>
-                          <div className="flex gap-3 pb-4">
-                            <div className="flex items-center">
-                              <Image src={cross} alt="cross" />
-                            </div>
-                            <p className="flex items-center  font-bold font-roboto md:text-[25px]  text-[20px] text-black ">
-                              CO2
-                            </p>
-                          </div>
-                          <div className="flex gap-3 pb-4">
-                            <div className="flex items-center">
-                              <Image src={cross} alt="cross" />
-                            </div>
-                            <p className="flex items-center  font-bold font-roboto md:text-[25px]  text-[20px] text-black ">
-                              Health
-                            </p>
-                          </div>
-                          <div className="flex gap-3 pb-4">
-                            <div className="flex items-center">
-                              <Image src={cross} alt="cross" />
-                            </div>
-                            <p className="flex items-center  font-bold font-roboto md:text-[25px]  text-[20px] text-black ">
-                              Trips
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="py-4 md:px-0 px-6">
-                        <h4 className="font-roboto font-bold md:text-[28px] text-[22px] text-black">
-                          Result
-                        </h4>
-                        <div className="py-4">
-                          <p className="flex items-center  font-bold font-roboto lg:text-[36px] md:text-[28px] text-[20px] text-black m-0 ">
+                          <p className="font-bold font-roboto lg:text-[32px] md:text-[25px] text-[15px] text-black">
                             ${(gameState?.budget || 0).toFixed(2)}
                           </p>
-                          <p className="flex items-center  font-bold font-roboto lg:text-[36px] md:text-[28px] text-[20px] text-black  m-0">
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex gap-3 items-center">
+                            <Image src={co2e} alt="co2e" width={28} height={28} className="w-7 h-7 object-contain" />
+                            <p className="font-bold font-roboto md:text-[25px] text-[15px] text-black">
+                              CO2 (tCO2e)
+                            </p>
+                          </div>
+                          <p className="font-bold font-roboto lg:text-[32px] md:text-[25px] text-[15px] text-black">
                             {(gameState?.totalCO2 || 0).toFixed(2)}
                           </p>
-                          <p className="flex items-center  font-bold font-roboto lg:text-[36px] md:text-[28px] text-[20px] text-black  m-0">
-                            {(gameState?.cityHealth || 0).toFixed(2)}%
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex gap-3 items-center">
+                            <Image src={health} alt="health" width={28} height={28} className="w-7 h-7 object-contain" />
+                            <p className="font-bold font-roboto md:text-[25px] text-[15px] text-black">
+                              Health (%)
+                            </p>
+                          </div>
+                          <p className="font-bold font-roboto lg:text-[32px] md:text-[25px] text-[15px] text-black">
+                            {(gameState?.cityHealth || 0).toFixed(2)}
                           </p>
-                          <p className="flex items-center  font-bold font-roboto lg:text-[36px] md:text-[28px] text-[20px] text-black m-0 ">
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex gap-3 items-center">
+                            <Image src={transport} alt="transport" width={28} height={28} className="w-7 h-7 object-contain" />
+                            <p className="font-bold font-roboto md:text-[25px] text-[15px] text-black">
+                              Shipment Count
+                            </p>
+                          </div>
+                          <p className="font-bold font-roboto lg:text-[32px] md:text-[25px] text-[15px] text-black">
                             {gameState?.totalTransportTrips || 0}
                           </p>
                         </div>
@@ -283,9 +274,9 @@ export default function page() {
                     {(gameCompleteResults || pairDetails) && (
                       <div className="mt-6">
                         <div className="flex gap-8 justify-center border-b border-black py-2">
-                          <Image src={blueNote} alt="blueNote" />
+                          {/* <Image src={blueNote} alt="blueNote" /> */}
                           <p className="flex items-center font-bold font-roboto md:text-[28px] text-[22px] text-black">
-                            Pair Results
+                            Details
                           </p>
                         </div>
 

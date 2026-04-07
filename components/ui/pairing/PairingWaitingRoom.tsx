@@ -81,14 +81,14 @@ export const PairingWaitingRoom: React.FC<PairingWaitingRoomProps> = ({
           </div>
         </div>
 
-        <div className={styles.tips}>
+        {/* <div className={styles.tips}>
           <h3>💡 While you wait:</h3>
           <ul>
             <li>Review your team strategy</li>
             <li>Check the game rules and objectives</li>
             <li>Plan your role-specific actions</li>
           </ul>
-        </div>
+        </div> */}
 
         {onLeavingQueue && (
           <button

@@ -29,7 +29,7 @@ export const SideContentMunicipality: React.FC<SideContentMunicipalityProps> = (
 }) => {
   const volumeOptions = ['volume', 'volume 2', 'volume 3'];
   const handleSelectVolume = (value: string) => {
-    console.log('Selected option:', value);
+    // console.log('Selected option:', value);
   };
 
   const sendOptions = ['MRF'];

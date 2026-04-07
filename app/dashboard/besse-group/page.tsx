@@ -93,44 +93,7 @@ export default function JoinGroupPage() {
   };
 
   const handleCreateCity = async () => {
-    setLoading(true);
-
-    try {
-      // Call create lobby endpoint
-      const response = await lobbyService.createLobby();
-
-      if (response.success) {
-        addNotification({
-          message: 'City created successfully!',
-          type: 'success',
-        });
-
-        const response1 = await authService.getProfile();
-        if (response1.success && response1.data) {
-          const user = response1.data.user;
-          updateUser(user);
-          router.push('/dashboard/team-members');
-        } else {
-          addNotification({
-            message: 'Failed to update profile. Please refresh the page.',
-            type: 'error',
-          });
-        }
-      } else {
-        addNotification({
-          message: response.message || 'Failed to create city',
-          type: 'error',
-        });
-      }
-    } catch (error: any) {
-      console.error('Create lobby error:', error);
-      addNotification({
-        message: error.response?.data?.message || 'Failed to create city. Please try again.',
-        type: 'error',
-      });
-    } finally {
-      setLoading(false);
-    }
+    router.push('/dashboard/game-mode');
   };
 
   return (

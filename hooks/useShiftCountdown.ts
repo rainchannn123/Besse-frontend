@@ -1,39 +1,71 @@
 import { useWebSocket } from '@/hooks/useWebSocket';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
-export const useShiftCountdown = (shiftStartTime: number | string | undefined) => {
-  const [shiftCountdown, setShiftCountdown] = useState<string>('30:00');
+export const useShiftCountdown = (
+  shiftStartTime: number | string | undefined,
+  onTimeUp?: () => void
+) => {
+  const [shiftCountdown, setShiftCountdown] = useState<string>('--:--');
   const { gameState } = useWebSocket();
+  const timeUpFiredRef = useRef(false);
+  const onTimeUpRef = useRef(onTimeUp);
 
   useEffect(() => {
-    const updateCountdown = () => {
-      if (gameState?.gameStartTime) {
-        // Use realtime data from backend
-        const startTime = new Date(gameState.gameStartTime).getTime();
-        const now = Date.now();
-        const elapsedMs = now - startTime;
-        const remainingMs = Math.max(0, 30 * 60 * 1000 - elapsedMs);
-        const minutes = Math.floor(remainingMs / 60000);
-        const seconds = Math.floor((remainingMs % 60000) / 1000);
-        setShiftCountdown(`${minutes}:${seconds.toString().padStart(2, '0')}`);
-      } else if (shiftStartTime) {
-        // Fallback to local calculation
-        const now = Date.now();
-        const startMs = new Date(shiftStartTime).getTime();
-        const shiftDurationMs = 30 * 60 * 1000;
-        const target = startMs + shiftDurationMs;
-        const remaining = Math.max(0, target - now);
+    onTimeUpRef.current = onTimeUp;
+  }, [onTimeUp]);
 
-        const minutes = Math.floor(remaining / 60000);
-        const seconds = Math.floor((remaining % 60000) / 1000);
-        setShiftCountdown(`${minutes}:${seconds.toString().padStart(2, '0')}`);
+  // Read constants from WebSocket gameState first, then fall back to localStorage init_state
+  const durationMinutes = useMemo(() => {
+    if (gameState?.constants?.REAL_TIME_GAME_DURATION_MINUTES) {
+      return gameState.constants.REAL_TIME_GAME_DURATION_MINUTES;
+    }
+    try {
+      const stored = localStorage.getItem('init_state');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed?.constants?.REAL_TIME_GAME_DURATION_MINUTES) {
+          return parsed.constants.REAL_TIME_GAME_DURATION_MINUTES;
+        }
+      }
+    } catch {}
+    return null;
+  }, [gameState?.constants?.REAL_TIME_GAME_DURATION_MINUTES]);
+
+  const startTime = gameState?.gameStartTime ?? shiftStartTime;
+
+  useEffect(() => {
+    if (!durationMinutes || !startTime) return;
+
+    const updateCountdown = () => {
+      const startMs = new Date(startTime).getTime();
+      const now = Date.now();
+      const elapsedMs = now - startMs;
+      const remainingMs = Math.max(0, durationMinutes * 60 * 1000 - elapsedMs);
+      const minutes = Math.floor(remainingMs / 60000);
+      const seconds = Math.floor((remainingMs % 60000) / 1000);
+      setShiftCountdown(`${minutes}:${seconds.toString().padStart(2, '0')}`);
+
+      // Fire onTimeUp once when the countdown reaches zero
+      if (remainingMs === 0 && !timeUpFiredRef.current) {
+        timeUpFiredRef.current = true;
+        onTimeUpRef.current?.();
       }
     };
 
     updateCountdown();
     const timer = setInterval(updateCountdown, 1000);
-    return () => clearInterval(timer);
-  }, [gameState?.gameStartTime]);
+
+    // Re-check immediately when tab becomes visible (intervals throttled in background)
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') updateCountdown();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [startTime, durationMinutes]);
 
   return shiftCountdown;
 };

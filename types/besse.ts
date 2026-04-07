@@ -200,6 +200,8 @@ export interface ProfileResponse
     };
   }> {}
 
+export type GameMode = 'waste' | 'energy';
+
 export type LobbyStage =
   | 'waiting-room'
   | 'role-selection'
@@ -211,6 +213,7 @@ export interface LobbyState {
   sessionId: string;
   lobbyCode: string; // 6-character alphanumeric code for joining
   leader: string; // User ID of the lobby leader
+  gameMode: GameMode;
   stage: LobbyStage;
   players: {
     userId: string;

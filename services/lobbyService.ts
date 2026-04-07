@@ -36,8 +36,8 @@ export const lobbyService = {
     return response.data;
   },
 
-  async createLobby(): Promise<CreateLobbyResponse> {
-    const response = await api.post<CreateLobbyResponse>('/lobby/create');
+  async createLobby(gameMode: string = 'waste'): Promise<CreateLobbyResponse> {
+    const response = await api.post<CreateLobbyResponse>('/lobby/create', { gameMode });
     return response.data;
   },
 

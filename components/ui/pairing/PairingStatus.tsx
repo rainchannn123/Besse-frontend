@@ -34,7 +34,7 @@ export const PairingStatus: React.FC<PairingStatusProps> = ({
     <div className={styles.container}>
       <div className={styles.content}>
         <div className={styles.header}>
-          <h2 className={styles.title}>🎉 Teams Paired!</h2>
+          <h2 className={styles.title}>Teams Paired!</h2>
           <p className={styles.subtitle}>Ready for competitive gameplay</p>
         </div>
 
@@ -77,7 +77,7 @@ export const PairingStatus: React.FC<PairingStatusProps> = ({
             </div>
           </div>
         )}
-
+{/* 
         <div className={styles.pairingInfo}>
           <div className={styles.infoItem}>
             <span className={styles.label}>Pair ID:</span>
@@ -87,7 +87,7 @@ export const PairingStatus: React.FC<PairingStatusProps> = ({
             <span className={styles.label}>Partner Session:</span>
             <span className={styles.value}>{partnerSessionId.substring(0, 12)}...</span>
           </div>
-        </div>
+        </div> */}
 
         <div className={styles.readyStatus}>
           <div className={styles.checkmark}>✓</div>
@@ -105,17 +105,6 @@ export const PairingStatus: React.FC<PairingStatusProps> = ({
             {isLoading ? 'Starting Game...' : 'Start Competitive Game'}
           </button>
         )}
-
-        <div className={styles.gameRules}>
-          <h4>📋 Game Rules</h4>
-          <ul>
-            <li>Both teams play simultaneously for 30 real-world minutes</li>
-            <li>Game spans 7 in-game days</li>
-            <li>Maximize city health and minimize CO₂ emissions</li>
-            <li>Competing team metrics are visible during gameplay</li>
-            <li>The team with better performance wins</li>
-          </ul>
-        </div>
       </div>
     </div>
   );

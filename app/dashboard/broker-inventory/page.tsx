@@ -1,6 +1,7 @@
 'use client';
 
 import MunicipalityCustomHeader from '@/components/layout/header/customheader/MunicipalityCustomHeader';
+import GameModeBadge from '@/components/ui/GameModeBadge';
 import { BrokerExternalWholesalerSelectedBox } from '@/components/ui/selectedBox/BrokerExternalWholesalerSelectedBox';
 import { BrokerGlobalAuctionSelectedBox } from '@/components/ui/selectedBox/BrokerGlobalAuctionSelectedBox';
 import ShiftLog from '@/components/ui/shiftLog/ShiftLog';
@@ -14,7 +15,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useNotificationStore } from '@/stores/notificationStore';
 import { GameState } from '@/types/besse';
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export default function BrokerInventoryPage() {
   const { user } = useAuthStore();
@@ -35,6 +36,9 @@ export default function BrokerInventoryPage() {
   const [statistics, setStatistics] = useState<any | null>(null);
   const [countdownRemaining, setCountdownRemaining] = useState<number | null>(null);
   const [lastActionType, setLastActionType] = useState<string | null>(null);
+  const [gameMode] = useState<string | null>(() =>
+    typeof window !== 'undefined' ? localStorage.getItem('game_mode') : null
+  );
   const { getCurrentGameSession, notifications, isConnected, subscribe, joinGame, emit } = useWebSocket();
 
   const currentGameState = gameState;
@@ -189,18 +193,19 @@ export default function BrokerInventoryPage() {
   >([]);
   const lastAppliedRef = useRef<number>(0);
   const pendingPayloadRef = useRef<any | null>(null);
+  const shiftStartTimeRef = useRef<number>(0);
 
   useEffect(() => {
     if (user?.currentSession && isConnected) {
-      console.log('Broker Inventory page: Calling joinGame with sessionId:', user.currentSession);
+      // console.log('Broker Inventory page: Calling joinGame with sessionId:', user.currentSession);
       joinGame(user.currentSession);
     } else {
-      console.log(
-        'Broker Inventory page: Not joining yet - user.currentSession:',
-        user?.currentSession,
-        'isConnected:',
-        isConnected
-      );
+      // console.log(
+      //   'Broker Inventory page: Not joining yet - user.currentSession:',
+      //   user?.currentSession,
+      //   'isConnected:',
+      //   isConnected
+      // );
     }
   }, [user?.currentSession, isConnected, joinGame]);
 
@@ -262,16 +267,16 @@ export default function BrokerInventoryPage() {
         actionType === 'auction-updated' ||
         actionType === 'material-graded'
       ) {
-        console.log('[Broker] Auction action - refreshing auctions');
+        // console.log('[Broker] Auction action - refreshing auctions');
         fetchGlobalAuctions();
       } else if (actionType === 'external-purchase') {
-        console.log('[Broker] External purchase - refreshing stock');
+        // console.log('[Broker] External purchase - refreshing stock');
         fetchExternalStock();
       }
     });
 
     const unsubCountdownExpired = subscribe('countdown-expired', (data: any) => {
-      console.log('Countdown expired received in Broker page:', data);
+      // console.log('Countdown expired received in Broker page:', data);
 
       if (data?.gameState) {
         setGameState(data.gameState);
@@ -292,36 +297,47 @@ export default function BrokerInventoryPage() {
     });
 
     const unsubCountdownStarted = subscribe('countdown-started', (data: any) => {
-      console.log('Countdown started received in Broker page:', data);
+      // console.log('Countdown started received in Broker page:', data);
       if (data?.gameState) {
         setGameState(data.gameState);
       }
     });
 
     const unsubCountdownCancelled = subscribe('countdown-cancelled', (data: any) => {
-      console.log('Countdown cancelled received in Broker page:', data);
+      // console.log('Countdown cancelled received in Broker page:', data);
       if (data?.gameState) {
         setGameState(data.gameState);
       }
     });
 
     const unsubPlayerAction = subscribe('player-action', (data: any) => {
-      const time = data?.timestamp
-        ? new Date(data.timestamp).toLocaleTimeString('en-US', {
-            hour12: false,
-          })
-        : new Date().toLocaleTimeString('en-US', { hour12: false });
+      const st = shiftStartTimeRef.current;
+      const elapsed = st ? Math.max(0, Date.now() - new Date(st).getTime()) : 0;
+      let durationMin = 15;
+      try { const stored = localStorage.getItem('init_state'); if (stored) { const p = JSON.parse(stored); if (p?.constants?.REAL_TIME_GAME_DURATION_MINUTES) durationMin = p.constants.REAL_TIME_GAME_DURATION_MINUTES; } } catch {}
+      const remainingMs = Math.max(0, durationMin * 60 * 1000 - elapsed);
+      const mins = Math.floor(remainingMs / 60000);
+      const secs = Math.floor((remainingMs % 60000) / 1000);
+      const time = `[${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}]`;
       const message = data?.playerName
         ? `${data.playerName} ${data.action || ''}`
         : JSON.stringify(data);
-      setLiveLogItems((prev) => [{ time, message, isLive: true }, ...prev].slice(0, 100));
+      setLiveLogItems((prev) => [...prev, { time, message, isLive: true }].slice(-100));
     });
 
-    const unsubSystemMessage = subscribe('system-message', (data: any) => {
-      const time = new Date().toLocaleTimeString('en-US', { hour12: false });
-      setLiveLogItems((prev) =>
-        [{ time, message: data.message, isLive: true, type: data.type }, ...prev].slice(0, 100)
-      );
+    // TEMPORARILY COMMENTED OUT - system messages for live log
+    const unsubSystemMessage = subscribe('system-message', (_data: any) => {
+      // const st = shiftStartTimeRef.current;
+      // const elapsed = st ? Math.max(0, Date.now() - new Date(st).getTime()) : 0;
+      // let durationMin = 15;
+      // try { const stored = localStorage.getItem('init_state'); if (stored) { const p = JSON.parse(stored); if (p?.constants?.REAL_TIME_GAME_DURATION_MINUTES) durationMin = p.constants.REAL_TIME_GAME_DURATION_MINUTES; } } catch {}
+      // const remainingMs = Math.max(0, durationMin * 60 * 1000 - elapsed);
+      // const mins = Math.floor(remainingMs / 60000);
+      // const secs = Math.floor((remainingMs % 60000) / 1000);
+      // const time = `[${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}]`;
+      // setLiveLogItems((prev) =>
+      //   [...prev, { time, message: data.message, isLive: true, type: data.type }].slice(-100)
+      // );
     });
 
     const unsubSurrenderUpdate = subscribe('surrender-update', (data: any) => {
@@ -345,17 +361,34 @@ export default function BrokerInventoryPage() {
     };
   }, [subscribe, router, fetchGameState, fetchGlobalAuctions, fetchExternalStock]);
 
-  const staticLogData =
-    currentGameState?.activityLog?.map((log, index) => ({
-      time: `[${String(currentGameState.currentGameHour).padStart(2, '0')}:${String(
-        (index * 15) % 60
-      ).padStart(2, '0')}]`,
-      message: log,
-    })) || [];
+  // Compute countdown-style timestamps for static logs
+  const getDurationMinutes = () => {
+    const c = currentGameState?.constants as any;
+    if (c?.REAL_TIME_GAME_DURATION_MINUTES) return c.REAL_TIME_GAME_DURATION_MINUTES;
+    try {
+      const stored = localStorage.getItem('init_state');
+      if (stored) { const p = JSON.parse(stored); if (p?.constants?.REAL_TIME_GAME_DURATION_MINUTES) return p.constants.REAL_TIME_GAME_DURATION_MINUTES; }
+    } catch {}
+    return 15;
+  };
+  const totalDurMin = getDurationMinutes();
+  // TEMPORARILY COMMENTED OUT - static activity log messages
+  // const staticLogData =
+  //   currentGameState?.activityLog?.map((log, index) => {
+  //     const elapsedMin = ((index + 1) / (currentGameState.activityLog?.length || 1)) * (currentGameState.minutesElapsed || 0);
+  //     const remainMin = Math.max(0, totalDurMin - elapsedMin);
+  //     const remMins = Math.floor(remainMin);
+  //     const remSecs = Math.floor((remainMin - remMins) * 60);
+  //     return {
+  //       time: `[${String(remMins).padStart(2, '0')}:${String(remSecs).padStart(2, '0')}]`,
+  //       message: log,
+  //     };
+  //   })?.reverse() || [];
+  const staticLogData: { time: string; message: string }[] = [];
 
   const authoritativeState = fullPayload?.gameState ?? currentGameState;
 
-  const logData = [...staticLogData];
+  const logData = [...staticLogData, ...liveLogItems];
 
   const stats =
     statistics ||
@@ -370,6 +403,15 @@ export default function BrokerInventoryPage() {
   const shiftStartTime = authoritativeState
     ? Date.now() - (authoritativeState.minutesElapsed || 0) * 60 * 1000
     : 0;
+
+  // Keep ref in sync for use in websocket callbacks
+  useEffect(() => {
+    shiftStartTimeRef.current = typeof shiftStartTime === 'number' ? shiftStartTime : 0;
+  }, [shiftStartTime]);
+
+  const handleStatusLog = useCallback((log: { time: string; message: string; isLive?: boolean; type?: 'info' | 'warning' | 'error' }) => {
+    setLiveLogItems((prev) => [...prev, log].slice(-100));
+  }, []);
 
   if (loading) {
     return (
@@ -407,6 +449,12 @@ export default function BrokerInventoryPage() {
               shiftStart={shiftStart}
               shiftStartTime={authoritativeState?.gameStartTime}
               gameOverCountdown={authoritativeState?.gameOverCountdown}
+              onGameOver={() => router.push('/dashboard/game-over')}
+              cityHealth={authoritativeState?.cityHealth}
+              budget={authoritativeState?.budget}
+              totalCO2={authoritativeState?.totalCO2}
+              wasteInventory={authoritativeState?.wasteInventory}
+              onStatusLog={handleStatusLog}
             />
           </div>
           <div className="grid grid-cols-1 gap-6">
@@ -419,6 +467,7 @@ export default function BrokerInventoryPage() {
                   backgroundImage={woodenHead.src}
                   title={authoritativeState?.teamRole || currentGameState?.teamRole}
                 />
+                <GameModeBadge gameMode={gameMode} />
                 {/* Tab Navigation */}
                 <div className="flex justify-center mb-4">
                   <div className="bg-white rounded-lg p-1 shadow-md flex">
@@ -447,7 +496,6 @@ export default function BrokerInventoryPage() {
                 <div>
                   {activeTab === 'global-auctions' ? (
                     <BrokerGlobalAuctionSelectedBox
-                      key={globalAuctions.map((a) => a.auctionId).join(',')}
                       auctions={globalAuctions}
                       selectedAuction={selectedAuction}
                       setSelectedAuction={setSelectedAuction}

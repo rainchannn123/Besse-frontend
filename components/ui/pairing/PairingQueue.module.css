@@ -15,19 +15,19 @@
 .title {
   font-size: 28px;
   font-weight: 700;
-  color: #1f2937;
+  color: #33552C;
   margin: 0 0 8px;
 }
 
 .subtitle {
   font-size: 14px;
-  color: #6b7280;
+  color: #8b6647;
   margin: 0 0 24px;
 }
 
 .description {
-  background: #f3f4f6;
-  border-left: 4px solid #667eea;
+  background: #F8F0DD;
+  border-left: 4px solid #b18c5a;
   padding: 16px;
   border-radius: 8px;
   margin-bottom: 24px;
@@ -36,7 +36,7 @@
 
 .description p {
   font-size: 14px;
-  color: #4b5563;
+  color: #33552C;
   line-height: 1.6;
   margin: 0;
 }
@@ -50,9 +50,9 @@
 
 .feature {
   padding: 16px;
-  background: #f9fafb;
+  background: #F8F0DD;
   border-radius: 8px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #b18c5a;
 }
 
 .icon {
@@ -64,18 +64,18 @@
 .feature p {
   font-size: 12px;
   font-weight: 600;
-  color: #374151;
+  color: #33552C;
   margin: 0;
 }
 
 .joinButton {
   width: 100%;
   padding: 14px 24px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #50704C 0%, #3A7D2C 100%);
   color: white;
   font-size: 16px;
   font-weight: 600;
-  border: none;
+  border: 2px solid #33552C;
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -88,7 +88,7 @@
 
 .joinButton:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 10px 20px rgba(51, 85, 44, 0.3);
 }
 
 .joinButton:disabled {
@@ -114,7 +114,7 @@
 
 .info {
   font-size: 13px;
-  color: #6b7280;
+  color: #8b6647;
   margin: 0;
   line-height: 1.5;
 }

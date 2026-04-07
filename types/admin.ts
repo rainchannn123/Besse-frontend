@@ -18,6 +18,7 @@ export interface AdminPlayerRow {
   status: AdminPlayerStatus;
   hasActiveSocketConnections: boolean;
   roleInSession: 'municipality' | 'mrf' | 'broker' | null;
+  gameMode: 'waste' | 'energy' | null;
   teamRole: 'Team A' | 'Team B' | null;
   isLobbyLeader: boolean;
   pairId: string | null;
@@ -37,6 +38,7 @@ export interface AdminPlayerRow {
 export interface AdminMatchTeam {
   sessionId: string;
   lobbyCode: string;
+  gameMode: 'waste' | 'energy';
   teamRole: 'Team A' | 'Team B' | null;
   stage: string;
   status: string;

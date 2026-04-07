@@ -91,7 +91,7 @@ export const useWebSocket = () => {
 
     // Game-specific events
     const handleJoinedGame: SocketCallback = (data) => {
-      console.log('Successfully joined game');
+      // console.log('Successfully joined game');
       addNotification('Successfully joined game room', 'success');
     };
 
@@ -131,12 +131,14 @@ export const useWebSocket = () => {
     };
 
     const handleGameComplete: SocketCallback = (data: any) => {
-      setGameState(data.gameState);
+      if (data.gameState) {
+        setGameState(data.gameState);
+      }
       addNotification(
         `Game Complete! Pair Score: ${data.pairAverageHealth?.toFixed(1) || 'N/A'}%`,
         'success'
       );
-      // The individual pages will handle redirecting to game-over
+      router.push('/dashboard/game-over');
     };
 
     const handleSystemCheckUpdate: GameStateCallback = (data) => {
@@ -153,24 +155,24 @@ export const useWebSocket = () => {
     // We still set up basic handlers here for logging/notifications, but
     // usePairingSystem is responsible for state management
     const handlePairingJoined: SocketCallback = (data: any) => {
-      console.log('[useWebSocket] pairing-joined event:', data);
+      // console.log('[useWebSocket] pairing-joined event:', data);
       // Don't update state here - let usePairingSystem handle it
     };
 
     const handlePairingStatusUpdate: SocketCallback = (data: any) => {
-      console.log('[useWebSocket] pairing-status-update event:', data);
+      // console.log('[useWebSocket] pairing-status-update event:', data);
       // Don't update state here - let usePairingSystem handle it
     };
 
     const handleTeamsPaired: SocketCallback = (data: any) => {
-      console.log('[useWebSocket] teams-paired event:', data);
+      // console.log('[useWebSocket] teams-paired event:', data);
       // Don't update state here - let usePairingSystem handle it
       // Just show a notification
       addNotification(`Teams paired! You are ${data.teamRole}`, 'success');
     };
 
     const handlePartnerEliminated: SocketCallback = (data: any) => {
-      console.log('[useWebSocket] partner-eliminated event:', data);
+      // console.log('[useWebSocket] partner-eliminated event:', data);
       addNotification(
         `Partner team ${data.partnerSessionId} eliminated: ${data.reason}`,
         'warning'
@@ -179,7 +181,7 @@ export const useWebSocket = () => {
     };
 
     const handlePairingLeft: SocketCallback = (data: any) => {
-      console.log('[useWebSocket] pairing-left event:', data);
+      // console.log('[useWebSocket] pairing-left event:', data);
       // Don't update state here - let usePairingSystem handle it
     };
 
@@ -195,7 +197,7 @@ export const useWebSocket = () => {
     socketManager.on('game-state-update', handleGameStateUpdate);
     socketManager.on('game-state-full', handleGameStateFull);
     socketManager.on('lobby-state-update', (data: any) => {
-      console.log('[useWebSocket] lobby-state-update event:', data);
+      // console.log('[useWebSocket] lobby-state-update event:', data);
       addNotification('Lobby state updated', 'info');
     });
     socketManager.on('system-message', handleSystemMessage);
@@ -218,16 +220,16 @@ export const useWebSocket = () => {
     socketManager.on('pairing-left', handlePairingLeft);
     socketManager.on('pair-score-updated', (data: any) => {
       // Handle pair score updates - could trigger UI updates or notifications
-      console.log('Pair score updated:', data);
+      // console.log('Pair score updated:', data);
       // Optional: Add notification for pair score changes
       addNotification(`Pair score updated: ${data.averagePairHealth}%`, 'info');
     });
     socketManager.on('countdown-expired', (data: any) => {
-      console.log('Countdown expired:', data);
+      // console.log('Countdown expired:', data);
       addNotification('Countdown expired!', 'warning');
     });
     socketManager.on('countdown-started', (data: any) => {
-      console.log('Countdown started:', data);
+      // console.log('Countdown started:', data);
       const reason = data?.reason || 'unknown';
       addNotification(`Game over countdown started: ${reason}`, 'warning');
       // Update game state if provided
@@ -236,7 +238,7 @@ export const useWebSocket = () => {
       }
     });
     socketManager.on('countdown-cancelled', (data: any) => {
-      console.log('Countdown cancelled:', data);
+      // console.log('Countdown cancelled:', data);
       addNotification('Countdown cancelled!', 'info');
       // Update game state if provided to clear the countdown
       if (data?.gameState) {
@@ -249,11 +251,11 @@ export const useWebSocket = () => {
       }
     });
     socketManager.on('lobby-activated', (data: any) => {
-      console.log('Lobby activated:', data);
+      // console.log('Lobby activated:', data);
       addNotification('Game is starting...', 'success');
     });
     socketManager.on('game-started', (data: any) => {
-      console.log('Game started:', data);
+      // console.log('Game started:', data);
       addNotification('Game has started!', 'success');
       // Update game state if provided
       if (data?.gameState) {
