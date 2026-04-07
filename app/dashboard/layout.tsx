@@ -46,9 +46,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }, [isAuthenticated, isLoading, router]);
 
-  // Fetch game state for municipality page
+  // Pages where an active GameSession exists (post-lobby)
+  const isGamePage = pathname === '/dashboard/municipality'
+    || pathname === '/dashboard/mrf-collection'
+    || pathname === '/dashboard/broker-inventory'
+    || pathname === '/dashboard/game-over';
+
+  // Fetch game state only on actual game pages
   useEffect(() => {
-    if (user?.currentSession && isAuthenticated) {
+    if (user?.currentSession && isAuthenticated && isGamePage) {
       const fetchGameState = async () => {
         try {
           const response = await gameService.getGameState(user.currentSession!);
@@ -61,14 +67,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       };
       fetchGameState();
     }
-  }, [pathname, user?.currentSession, isAuthenticated]);
+  }, [pathname, user?.currentSession, isAuthenticated, isGamePage]);
 
   // Subscribe to realtime updates for header/footer data on ALL authenticated pages
   useEffect(() => {
     if (!isAuthenticated || !user) return;
 
-    // Join the game room when websocket connected and user has a session
-    if (isConnected && user.currentSession) {
+    // Join the game room only on pages where a game actually exists
+    if (isConnected && user.currentSession && isGamePage) {
       joinGame(user.currentSession);
     }
 
@@ -129,7 +135,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       unsubSystemCheckUpdate && unsubSystemCheckUpdate();
       unsubPlayerAction && unsubPlayerAction();
     };
-  }, [isAuthenticated, user, isConnected, subscribe, joinGame, router]);
+  }, [isAuthenticated, user, isConnected, isGamePage, subscribe, joinGame, router]);
 
   // Show loading while checking authentication
   if (isLoading || isCheckingAuth) {

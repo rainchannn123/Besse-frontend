@@ -34,11 +34,16 @@ export default function Page() {
   }, [initializeAuth]);
 
   const getLobbyState = async (sessionId: string) => {
-    const response = await lobbyService.getLobbyState(sessionId);
-    // console.log('Lobby State Response:', response);
+    try {
+      const response = await lobbyService.getLobbyState(sessionId);
 
-    if (response.data?.lobbyState) {
-      router.push(getLobbyRoute(response.data.lobbyState, user?._id));
+      if (response.data?.lobbyState) {
+        router.push(getLobbyRoute(response.data.lobbyState, user?._id));
+      }
+    } catch {
+      // Lobby no longer exists (game already started or session expired)
+      // Redirect to dashboard — the game pages will handle active sessions
+      router.push('/dashboard/besse-group');
     }
   };
 

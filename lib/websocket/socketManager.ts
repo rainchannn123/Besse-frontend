@@ -341,6 +341,14 @@ class SocketManager {
 
     // Default error handler
     this.socket.on('error', (error: any) => {
+      // If access denied, the stored game session is stale — clear it
+      if (error?.message === 'You do not have access to this game session') {
+        this.currentGameSession = null;
+        this.lastJoinedSession = null;
+        this.lastJoinedSocketId = null;
+        this.persistGameSession(null);
+        return;
+      }
       console.error('WebSocket error:', error);
       this.emitEvent('error', error);
     });

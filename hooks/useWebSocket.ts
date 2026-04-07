@@ -186,6 +186,8 @@ export const useWebSocket = () => {
     };
 
     const handleError: ErrorCallback = (error) => {
+      // Skip non-critical access errors (stale session on reconnect)
+      if (error?.message === 'You do not have access to this game session') return;
       console.error('Game error:', error);
       addNotification(`Error: ${error.message || 'Something went wrong'}`, 'error');
     };
