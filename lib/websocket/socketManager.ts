@@ -114,7 +114,6 @@ class SocketManager {
     });
 
     this.setupEventHandlers();
-    this.setupGameEventForwarding();
   }
 
   disconnect(): void {
@@ -145,11 +144,6 @@ class SocketManager {
       this.eventListeners.set(event, new Set());
     }
     this.eventListeners.get(event)!.add(callback);
-
-    // Also set up socket.io listener for game events
-    if (this.isGameEvent(event)) {
-      this.socket?.on(event, callback);
-    }
   }
 
   off(event: GameEvent, callback?: SocketCallback): void {
@@ -368,48 +362,6 @@ class SocketManager {
     });
   }
 
-  private setupGameEventForwarding(): void {
-    if (!this.socket) return;
-
-    const gameEvents: GameEvent[] = [
-      'joined-game',
-      'game-state-update',
-      'game-state-full',
-      'lobby-state-update',
-      'waste-collected',
-      'waste-rejected',
-      'material-ordered',
-      'waste-processed',
-      'material-graded',
-      'material-sold-external',
-      'material-transferred',
-      'system-check-update',
-      'turn-ended',
-      'game-complete',
-      'system-message',
-      'player-action',
-      'pairing-joined',
-      'pairing-status-update',
-      'teams-paired',
-      'partner-eliminated',
-      'pairing-left',
-      'pair-score-updated',
-      'countdown-expired',
-      'countdown-started',
-      'countdown-cancelled',
-      'external-purchase',
-      'lobby-activated',
-      'game-started',
-    ];
-
-    gameEvents.forEach((event) => {
-      this.socket?.on(event, (data: any) => {
-        // Forward to internal event system
-        this.emitEvent(event, data);
-      });
-    });
-  }
-
   private emitEvent(event: GameEvent, data?: any): void {
     const listeners = this.eventListeners.get(event);
     if (listeners) {
@@ -421,43 +373,6 @@ class SocketManager {
         }
       });
     }
-  }
-
-  private isGameEvent(event: string): boolean {
-    const gameEvents = [
-      'joined-game',
-      'game-state-update',
-      'game-state-full',
-      'lobby-state-update',
-      'waste-collected',
-      'waste-rejected',
-      'material-ordered',
-      'waste-processed',
-      'material-graded',
-      'material-sold-external',
-      'material-transferred',
-      'system-check-update',
-      'turn-ended',
-      'game-complete',
-      'system-message',
-      'player-action',
-      'pairing-joined',
-      'pairing-status-update',
-      'teams-paired',
-      'partner-eliminated',
-      'pairing-left',
-      'pair-score-updated',
-      'countdown-expired',
-      'countdown-started',
-      'countdown-cancelled',
-      'auction-updated',
-      'bid-placed',
-      'material-graded',
-      'external-purchase',
-      'lobby-activated',
-      'game-started',
-    ];
-    return gameEvents.includes(event);
   }
 
   private handleReconnect(): void {
