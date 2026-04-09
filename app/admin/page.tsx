@@ -120,13 +120,26 @@ export default function AdminMonitorPage() {
         type: 'success',
       });
 
-      await loadOverview(true);
+      // Immediately update local state so the button disables before overview refreshes
+      setOverview(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          players: prev.players.map(p =>
+            p.userId === player.userId
+              ? { ...p, currentSession: null, status: 'offline' as AdminPlayerStatus }
+              : p
+          ),
+        };
+      });
+
+      setActionLoadingUserId(null);
+      loadOverview(true);
     } catch (error: any) {
       addNotification({
         message: error.response?.data?.message || 'Failed to force-exit player',
         type: 'error',
       });
-    } finally {
       setActionLoadingUserId(null);
     }
   };

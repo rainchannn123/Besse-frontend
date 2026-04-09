@@ -157,16 +157,16 @@ const ShiftLog: React.FC<ShiftLogProps> = ({
   }, [logs.length, logs]);
 
   return (
-    <div className="grid 2xl:grid-cols-3 md:grid-cols-2 grid-cols-1 gap-4">
+    <div className="grid 2xl:grid-cols-3 md:grid-cols-2 grid-cols-1 gap-2">
       {/* Left: Logs */}
       <div
         ref={containerRef}
-        className="bg-white border-4 border-dashed border-[#b18c5a] p-3 text-sm rounded-md 2xl:col-span-2 lg:col-span-1 col-span-1 h-[200px] overflow-y-auto flex flex-col"
+        className="bg-white border-4 border-dashed border-[#b18c5a] p-2 text-sm rounded-md 2xl:col-span-2 lg:col-span-1 col-span-1 h-[140px] overflow-y-auto flex flex-col"
       >
         <div className="mt-auto" />
         {logs.map((log, index) => (
-          <div key={index} className="mb-1 flex items-start">
-            <p className="font-poppins xl:text-[13px] lg:text-[12px] text-[12px] leading-[1.5] text-black">
+          <div key={index} className="mb-0.5 flex items-start">
+            <p className="font-poppins xl:text-[12px] lg:text-[11px] text-[11px] leading-[1.4] text-black">
               {log.time} – {log.message}
             </p>
           </div>
@@ -174,23 +174,23 @@ const ShiftLog: React.FC<ShiftLogProps> = ({
       </div>
 
       {/* Right: Time */}
-      <div className="flex flex-col justify-center gap-2">
+      <div className="flex flex-col justify-center gap-1">
         {/* 30-minute shift countdown - ALWAYS SHOW */}
-        <div className="bg-[#8b6647] px-2 rounded-[30px] flex items-center justify-center h-[60px] w-full col-span-1 gap-2">
-          <span className="font-bold xl:text-[28px] lg:text-[24px] md:text-[20px] text-[16px] text-white font-roboto pr-3">
+        <div className="bg-[#8b6647] px-2 rounded-[30px] flex items-center justify-center h-[50px] w-full col-span-1 gap-2">
+          <span className="font-bold xl:text-[22px] lg:text-[18px] md:text-[16px] text-[14px] text-white font-roboto pr-2">
             Day {currentDay} -
           </span>
           {gameOverDisplay ? (
-            <span className="font-bold xl:text-[28px] lg:text-[24px] md:text-[20px] text-[16px] text-white font-roboto animate-pulse">
+            <span className="font-bold xl:text-[22px] lg:text-[18px] md:text-[16px] text-[14px] text-white font-roboto animate-pulse">
               {gameOverDisplay}
             </span>
           ) : (
-            <span className="font-bold xl:text-[28px] lg:text-[24px] md:text-[20px] text-[16px] text-white font-roboto">
+            <span className="font-bold xl:text-[22px] lg:text-[18px] md:text-[16px] text-[14px] text-white font-roboto">
               {shiftCountdown}
             </span>
           )}
           <div className="flex-shrink-0">
-            <Image src={clock} alt="clock" width={40} height={40} />
+            <Image src={clock} alt="clock" width={32} height={32} />
           </div>
         </div>
       </div>

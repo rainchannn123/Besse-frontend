@@ -68,8 +68,8 @@ export const BrokerGlobalAuctionSelectedBox: React.FC<BrokerGlobalAuctionSelecte
   };
 
   return (
-    <div className="w-full flex justify-center mt-8 pb-6">
-      <div className="grid lg:grid-cols-3 md:grid-cols-2 grid-cols-1 gap-5 w-full p-4 h-[600px] overflow-y-auto">
+      <div className="w-full flex justify-center mt-2 pb-2 lg:h-full">
+        <div className="grid lg:grid-cols-3 md:grid-cols-2 grid-cols-1 gap-3 w-full p-2 lg:h-full lg:overflow-y-auto content-start">
         {auctions.length > 0 ? (
           auctions.map((auction) => {
             const expired = isExpired(auction);
@@ -180,7 +180,7 @@ export const BrokerGlobalAuctionSelectedBox: React.FC<BrokerGlobalAuctionSelecte
             );
           })
         ) : (
-          <div className="col-span-full flex items-center justify-center h-[600px]">
+            <div className="col-span-full flex items-center justify-center h-full">
             <p className="text-[#8b7355] text-lg">No auctions available</p>
           </div>
         )}

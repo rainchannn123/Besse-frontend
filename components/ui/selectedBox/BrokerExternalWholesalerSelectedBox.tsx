@@ -40,8 +40,8 @@ export const BrokerExternalWholesalerSelectedBox: React.FC<
 
   if (!stock) {
     return (
-      <div className="w-full flex justify-center mt-8 pb-6">
-        <div className="flex items-center justify-center h-[600px] w-full">
+        <div className="w-full flex justify-center mt-2 pb-2 lg:h-full">
+          <div className="flex items-center justify-center lg:h-full w-full">
           <p className="text-gray-500 text-lg">Loading stock...</p>
         </div>
       </div>
@@ -49,8 +49,8 @@ export const BrokerExternalWholesalerSelectedBox: React.FC<
   }
 
   return (
-    <div className="w-full flex justify-center mt-8 pb-6">
-      <div className="grid lg:grid-cols-2 md:grid-cols-2 grid-cols-1 gap-5 w-full p-4 h-[600px] overflow-y-auto">
+      <div className="w-full flex justify-center mt-2 pb-2 lg:h-full">
+        <div className="grid lg:grid-cols-2 md:grid-cols-2 grid-cols-1 gap-3 w-full p-2 lg:h-full lg:overflow-y-auto content-start">
         {stock.length > 0 ? (
           stock.map((item) => {
             const isSelected = isItemSelected(item);
@@ -118,7 +118,7 @@ export const BrokerExternalWholesalerSelectedBox: React.FC<
             );
           })
         ) : (
-          <div className="col-span-full flex items-center justify-center h-[600px]">
+            <div className="col-span-full flex items-center justify-center h-full">
             <p className="text-gray-500 text-lg">No stock available</p>
           </div>
         )}

@@ -16,15 +16,15 @@ export const MunicipalityMaterialSelectedBox: React.FC<MunicipalityMaterialSelec
   setSelectedMaterial,
 }) => {
   return (
-    <div className="w-full flex justify-center mt-8 pb-6">
-      <div className="grid lg:grid-cols-3 md:grid-cols-2 grid-cols-1 gap-5 w-full p-4 h-[600px] overflow-y-auto">
+      <div className="w-full flex justify-center mt-2 pb-2 lg:h-full">
+        <div className="grid lg:grid-cols-3 md:grid-cols-2 grid-cols-1 gap-3 w-full p-2 lg:h-full lg:overflow-y-auto content-start">
         {materials.map((material) => {
           const isSelected = selectedMaterial?.id === material.id;
 
           return (
             <div
               key={material.id}
-              className={`relative w-full h-[300px] rounded-lg p-4 flex flex-col cursor-pointer transition-all duration-300 transform hover:scale-105 group ${
+              className={`relative w-full h-[220px] rounded-lg p-3 flex flex-col cursor-pointer transition-all duration-300 transform hover:scale-105 group ${
                 isSelected
                   ? 'bg-linear-to-br from-[#3A7D2C] to-[#2d6322] text-white shadow-lg'
                   : 'bg-white text-gray-800 shadow-md hover:shadow-xl'
@@ -101,7 +101,7 @@ export const MunicipalityMaterialSelectedBox: React.FC<MunicipalityMaterialSelec
         {[...Array(Math.max(0, 6 - materials.length))].map((_, index) => (
           <div
             key={`empty-${index}`}
-            className="bg-gray-100 h-[307px] rounded-lg shadow-lg flex items-center justify-center"
+              className="bg-gray-100 h-[220px] rounded-lg shadow-lg flex items-center justify-center"
           >
             <p className="text-gray-500">No material available</p>
           </div>

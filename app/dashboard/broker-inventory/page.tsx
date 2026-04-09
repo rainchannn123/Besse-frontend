@@ -440,10 +440,10 @@ export default function BrokerInventoryPage() {
   }
 
   return (
-    <div>
-      <div className="bg-[#f3e9da] min-h-screen">
-        <div className="container mx-auto sm:p-0 p-6">
-          <div className="md:-0 p-3">
+    <div className="lg:h-full flex flex-col lg:overflow-hidden">
+      <div className="bg-[#f3e9da] flex-1 flex flex-col lg:min-h-0 lg:overflow-hidden">
+        <div className="container mx-auto sm:p-0 px-4 flex flex-col flex-1 lg:min-h-0 lg:overflow-hidden gap-3">
+          <div className="flex-shrink-0">
             <ShiftLog
               logs={logData}
               shiftStart={shiftStart}
@@ -457,10 +457,10 @@ export default function BrokerInventoryPage() {
               onStatusLog={handleStatusLog}
             />
           </div>
-          <div className="grid grid-cols-1 gap-6">
-            <div className="col-span-1">
+          <div className="grid grid-cols-1 gap-3 flex-1 lg:min-h-0 lg:overflow-hidden">
+            <div className="col-span-1 flex flex-col lg:min-h-0 lg:overflow-hidden">
               <div
-                className="bg-cover bg-center mx-auto rounded-[20px] mb-8"
+                className="bg-cover bg-center mx-auto rounded-[20px] flex flex-col lg:min-h-0 overflow-hidden w-full flex-1"
                 style={{ backgroundImage: `url(${woodenBg.src})` }}
               >
                 <MunicipalityCustomHeader
@@ -469,11 +469,11 @@ export default function BrokerInventoryPage() {
                 />
                 <GameModeBadge gameMode={gameMode} />
                 {/* Tab Navigation */}
-                <div className="flex justify-center mb-4">
+                <div className="flex justify-center mb-1 flex-shrink-0">
                   <div className="bg-white rounded-lg p-1 shadow-md flex">
                     <button
                       onClick={() => setActiveTab('global-auctions')}
-                      className={`px-6 py-2 rounded-md font-semibold transition-colors ${
+                      className={`px-4 py-1 rounded-md text-sm font-semibold transition-colors ${
                         activeTab === 'global-auctions'
                           ? 'bg-[#3A7D2C] text-white'
                           : 'text-gray-600 hover:bg-gray-100'
@@ -483,7 +483,7 @@ export default function BrokerInventoryPage() {
                     </button>
                     <button
                       onClick={() => setActiveTab('external-wholesaler')}
-                      className={`px-6 py-2 rounded-md font-semibold transition-colors ${
+                      className={`px-4 py-1 rounded-md text-sm font-semibold transition-colors ${
                         activeTab === 'external-wholesaler'
                           ? 'bg-[#3A7D2C] text-white'
                           : 'text-gray-600 hover:bg-gray-100'
@@ -493,7 +493,7 @@ export default function BrokerInventoryPage() {
                     </button>
                   </div>
                 </div>
-                <div>
+                <div className="flex-1 lg:min-h-0 lg:overflow-hidden">
                   {activeTab === 'global-auctions' ? (
                     <BrokerGlobalAuctionSelectedBox
                       auctions={globalAuctions}

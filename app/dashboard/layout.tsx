@@ -161,7 +161,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       : null;
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col relative">
+    <div className={isMunicipalityPage && gameState ? "min-h-screen lg:h-screen bg-gray-50 flex flex-col relative lg:overflow-hidden" : "min-h-screen bg-gray-50 flex flex-col relative"}>
       <UserLogoutButton />
       {isMunicipalityPage && gameState ? (
         <MunicipalityHeader
@@ -174,7 +174,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       ) : (
         <Header />
       )}
-      <main className="flex-1 bgColor">{children}</main>
+      <main className={isMunicipalityPage && gameState ? "flex-1 lg:min-h-0 bgColor lg:overflow-hidden py-3" : "flex-1 bgColor"}>{children}</main>
 
       <NotificationCenter
         notifications={notifications}

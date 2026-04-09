@@ -10,14 +10,14 @@ const MunicipalityCustomHeader: React.FC<MunicipalityCustomHeaderProps> = ({
 }) => {
     return (
         <div
-            className="p-3 text-center h-[83px] rounded-[10px] flex items-center justify-center"
+            className="p-2 text-center h-[50px] rounded-[10px] flex items-center justify-center"
             style={{
                 backgroundImage: `url(${backgroundImage})`,
                 backgroundSize: "cover",
                 backgroundPosition: "center",
             }}
         >
-            <h1 className="lg:text-[36px] md:text-[28px]  sm:text-[24px] text-[22px] text-white font-bold tracking-wide font-roboto ">
+            <h1 className="lg:text-[24px] md:text-[20px]  sm:text-[18px] text-[16px] text-white font-bold tracking-wide font-roboto ">
                 {title}
             </h1>
         </div>

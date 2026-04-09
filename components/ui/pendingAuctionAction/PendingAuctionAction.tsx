@@ -39,7 +39,7 @@ export const PendingAuctionAction: React.FC<PendingAuctionActionProps> = ({
   };
 
   return (
-    <div className="bg-white border-4 border-dashed border-[#b18c5a] rounded-md p-4">
+    <div className="bg-white border-4 border-dashed border-[#b18c5a] rounded-md p-2">
       <h3 className="text-center 2xl:text-[35px] xl:text-[28px] lg:text-[35px] text-[35px] font-bold text-black mb-1">
         Activate Auction
       </h3>

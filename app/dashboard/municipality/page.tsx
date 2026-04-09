@@ -576,10 +576,10 @@ export default function MunicipalityPage() {
   const canSurrender = (authoritativeState?.minutesElapsed ?? 0) >= 15;
 
   return (
-    <div>
-      <div className="bg-[#f3e9da] min-h-screen">
-        <div className="container mx-auto sm:p-0 p-6">
-          <div className="md:-0 p-3">
+    <div className="lg:h-full flex flex-col lg:overflow-hidden">
+      <div className="bg-[#f3e9da] flex-1 flex flex-col lg:min-h-0 lg:overflow-hidden">
+        <div className="container mx-auto sm:p-0 px-4 flex flex-col flex-1 lg:min-h-0 lg:overflow-hidden gap-3">
+          <div className="flex-shrink-0">
             <ShiftLog
               logs={logData}
               shiftStart={shiftStart}
@@ -593,11 +593,11 @@ export default function MunicipalityPage() {
               onStatusLog={handleStatusLog}
             />
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 flex-1 lg:min-h-0 lg:overflow-hidden">
             {/* Left side */}
-            <div className="xl:col-span-3  lg:col-span-2 col-span-1">
+            <div className="xl:col-span-3 lg:col-span-2 col-span-1 flex flex-col lg:min-h-0 lg:overflow-hidden">
               <div
-                className="bg-cover bg-center mx-auto rounded-[20px] mb-8"
+                className="bg-cover bg-center mx-auto rounded-[20px] flex flex-col lg:min-h-0 overflow-hidden w-full flex-1"
                 style={{ backgroundImage: `url(${woodenBg.src})` }}
               >
                 <MunicipalityCustomHeader
@@ -606,7 +606,7 @@ export default function MunicipalityPage() {
                 />
                 <GameModeBadge gameMode={gameMode} />
                 {/* Tab Navigation */}
-                <div className="flex justify-center mb-4">
+                <div className="flex justify-center mb-1 flex-shrink-0">
                   <div className="bg-white rounded-lg p-1 shadow-md">
                     <button
                       onClick={() => {
@@ -615,7 +615,7 @@ export default function MunicipalityPage() {
                         setSelectedMaterial(null);
                         setSelectedProject(null);
                       }}
-                      className={`px-6 py-2 rounded-md font-semibold transition-colors ${
+                      className={`px-4 py-1 rounded-md text-sm font-semibold transition-colors ${
                         activeTab === 'waste-collection'
                           ? 'bg-[#3A7D2C] text-white'
                           : 'text-gray-600 hover:bg-gray-100'
@@ -630,7 +630,7 @@ export default function MunicipalityPage() {
                         setSelectedMaterial(null);
                         setSelectedProject(null);
                       }}
-                      className={`px-6 py-2 rounded-md font-semibold transition-colors ${
+                      className={`px-4 py-1 rounded-md text-sm font-semibold transition-colors ${
                         activeTab === 'city-projects'
                           ? 'bg-[#3A7D2C] text-white'
                           : 'text-gray-600 hover:bg-gray-100'
@@ -640,7 +640,7 @@ export default function MunicipalityPage() {
                     </button>
                   </div>
                 </div>
-                <div>
+                <div className="flex-1 lg:min-h-0 lg:overflow-hidden">
                   {activeTab === 'waste-collection' ? (
                     <MunicipalityWasteSelectedBox
                       key={wasteBatches.map((b) => b.id).join(',')}
@@ -676,7 +676,7 @@ export default function MunicipalityPage() {
               </div>
             </div>
             {/* Right side */}
-            <div className="xl:col-span-1  lg:col-span-2 col-span-1">
+            <div className="xl:col-span-1 lg:col-span-2 col-span-1 lg:overflow-y-auto lg:min-h-0">
               {activeTab === 'waste-collection' ? (
                 selectedItem && 'status' in selectedItem ? (
                   <WasteCollectAction

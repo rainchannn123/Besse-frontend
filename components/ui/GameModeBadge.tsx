@@ -15,8 +15,8 @@ const GameModeBadge: React.FC<GameModeBadgeProps> = ({ gameMode }) => {
   const label = gameModeLabels[gameMode] || gameMode;
 
   return (
-    <div className="flex items-center justify-center py-2">
-      <span className="font-roboto font-bold text-[16px] md:text-[18px] text-[#33552C] bg-[#e8dcc8] border border-[#33552C] rounded-[6px] px-4 py-1 tracking-wide">
+    <div className="flex items-center justify-center py-1">
+      <span className="font-roboto font-bold text-[13px] md:text-[14px] text-[#33552C] bg-[#e8dcc8] border border-[#33552C] rounded-[6px] px-3 py-0.5 tracking-wide">
         Game Mode: {label}
       </span>
     </div>
