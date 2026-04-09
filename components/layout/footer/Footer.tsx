@@ -12,12 +12,14 @@ export const Footer: React.FC = () => {
   switch (true) {
     case pathname.startsWith('/dashboard/team-members'):
     case pathname.startsWith('/dashboard/team-member'):
-    case pathname.startsWith('/dashboard/game-over'):
     case pathname.startsWith('/dashboard/besse-group'):
     case pathname.startsWith('/dashboard/role'):
     case pathname.startsWith('/auth/login'):
     case pathname.startsWith('/auth/register'):
       return <DefaultFooter />;
+
+    case pathname.startsWith('/dashboard/game-over'):
+      return null;
 
     case pathname.startsWith('/dashboard/broker-relationship'):
     case pathname.startsWith('/dashboard/broker-inventory'):

@@ -28,6 +28,7 @@ export default function page() {
   const [loading, setLoading] = useState(true);
   const [gameCompleteResults, setGameCompleteResults] = useState<any>(null);
   const [pairDetails, setPairDetails] = useState<any>(null);
+  const [lobbyCode, setLobbyCode] = useState<string | null>(null);
 
   // Use WebSocket for real-time updates
   const { subscribe, joinGame, leaveGame } = useGameWebSocket(user?.currentSession || undefined);
@@ -46,6 +47,8 @@ export default function page() {
       const response = await gameService.getGameState(user.currentSession);
       if (response.success && response.data) {
         setGameState(response.data.gameState);
+        // Fetch lobby code for room code display
+        fetchLobbyCode(user.currentSession!);
         // Fetch pair details if game has pairId
         if (response.data.gameState.pairId) {
           fetchPairDetails(response.data.gameState.pairId);
@@ -63,6 +66,17 @@ export default function page() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchLobbyCode = async (sessionId: string) => {
+    try {
+      const response = await lobbyService.getLobbyState(sessionId);
+      if (response.success && response.data) {
+        setLobbyCode(response.data.lobbyState.lobbyCode);
+      }
+    } catch (err: any) {
+      console.error('Failed to fetch lobby code:', err);
     }
   };
 
@@ -214,9 +228,9 @@ export default function page() {
                   </div>
                 </div>
 
-                <div className="bg-white h-full w-full lg:p-6 md:p-18 sm:p-10 p-6">
-                  <div className="border border-black rounded-[10px]">
-                    <div className="flex gap-8 justify-center border-b border-black lg:py-1 py-2">
+                <div className="bg-white h-full w-full lg:p-6 md:p-18 sm:p-10 p-6 flex flex-col">
+                  <div className="rounded-[10px]">
+                    <div className="flex gap-8 justify-center border-b border-gray-300 lg:py-1 py-2">
                       <p className="flex items-center font-bold font-roboto lg:text-[22px] md:text-[28px] text-[22px] text-black">
                         Game Summary
                       </p>
@@ -280,160 +294,16 @@ export default function page() {
                         </div>
                       </div>
                     </div>
-
-                    {/* Pair Results Section - Only show for complete games */}
-                    {(gameCompleteResults || pairDetails) && (
-                      <div className="lg:mt-2 mt-6">
-                        <div className="flex gap-8 justify-center border-b border-black lg:py-1 py-2">
-                          <p className="flex items-center font-bold font-roboto lg:text-[22px] md:text-[28px] text-[22px] text-black">
-                            Details
-                          </p>
-                        </div>
-
-                        {/* Pair Data Table */}
-                        {pairDetails && (
-                          <div className="lg:mt-2 mt-4 overflow-x-auto">
-                            <table className="w-full border-collapse border border-black">
-                              <thead>
-                                <tr className="bg-gray-100">
-                                  <th className="border border-black lg:px-2 lg:py-1 px-4 py-2 text-left font-bold font-roboto lg:text-[14px] md:text-[18px] text-[14px] text-black">
-                                    Metric
-                                  </th>
-                                  <th className="border border-black lg:px-2 lg:py-1 px-4 py-2 text-center font-bold font-roboto lg:text-[14px] md:text-[18px] text-[14px] text-black">
-                                    Team A
-                                  </th>
-                                  <th className="border border-black lg:px-2 lg:py-1 px-4 py-2 text-center font-bold font-roboto lg:text-[14px] md:text-[18px] text-[14px] text-black">
-                                    Team B
-                                  </th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                <tr>
-                                  <td className="border border-black lg:px-2 lg:py-1 px-4 py-2 font-medium font-roboto lg:text-[13px] md:text-[16px] text-[12px] text-black">
-                                    Session ID
-                                  </td>
-                                  <td className="border border-black lg:px-2 lg:py-1 px-4 py-2 text-center font-roboto lg:text-[13px] md:text-[16px] text-[12px] text-black">
-                                    {pairDetails.teamASessionId}
-                                  </td>
-                                  <td className="border border-black lg:px-2 lg:py-1 px-4 py-2 text-center font-roboto lg:text-[13px] md:text-[16px] text-[12px] text-black">
-                                    {pairDetails.teamBSessionId}
-                                  </td>
-                                </tr>
-                                <tr className="bg-gray-50">
-                                  <td className="border border-black lg:px-2 lg:py-1 px-4 py-2 font-medium font-roboto lg:text-[13px] md:text-[16px] text-[12px] text-black">
-                                    Health
-                                  </td>
-                                  <td className="border border-black lg:px-2 lg:py-1 px-4 py-2 text-center font-roboto lg:text-[13px] md:text-[16px] text-[12px] text-black">
-                                    {pairDetails.teamAHealth?.toFixed(1) || 'N/A'}%
-                                  </td>
-                                  <td className="border border-black lg:px-2 lg:py-1 px-4 py-2 text-center font-roboto lg:text-[13px] md:text-[16px] text-[12px] text-black">
-                                    {pairDetails.teamBHealth?.toFixed(1) || 'N/A'}%
-                                  </td>
-                                </tr>
-                                <tr>
-                                  <td className="border border-black lg:px-2 lg:py-1 px-4 py-2 font-medium font-roboto lg:text-[13px] md:text-[16px] text-[12px] text-black">
-                                    Budget
-                                  </td>
-                                  <td className="border border-black lg:px-2 lg:py-1 px-4 py-2 text-center font-roboto lg:text-[13px] md:text-[16px] text-[12px] text-black">
-                                    ${pairDetails.teamABudget.toFixed(0)}
-                                  </td>
-                                  <td className="border border-black lg:px-2 lg:py-1 px-4 py-2 text-center font-roboto lg:text-[13px] md:text-[16px] text-[12px] text-black">
-                                    ${pairDetails.teamBBudget.toFixed(0)}
-                                  </td>
-                                </tr>
-                                <tr className="bg-gray-50">
-                                  <td className="border border-black lg:px-2 lg:py-1 px-4 py-2 font-medium font-roboto lg:text-[13px] md:text-[16px] text-[12px] text-black">
-                                    CO2 Emissions
-                                  </td>
-                                  <td className="border border-black lg:px-2 lg:py-1 px-4 py-2 text-center font-roboto lg:text-[13px] md:text-[16px] text-[12px] text-black">
-                                    {pairDetails.teamACO2.toFixed(1)} tons
-                                  </td>
-                                  <td className="border border-black lg:px-2 lg:py-1 px-4 py-2 text-center font-roboto lg:text-[13px] md:text-[16px] text-[12px] text-black">
-                                    {pairDetails.teamBCO2.toFixed(1)} tons
-                                  </td>
-                                </tr>
-                                <tr>
-                                  <td className="border border-black lg:px-2 lg:py-1 px-4 py-2 font-medium font-roboto lg:text-[13px] md:text-[16px] text-[12px] text-black">
-                                    Game Status
-                                  </td>
-                                  <td className="border border-black lg:px-2 lg:py-1 px-4 py-2 text-center font-roboto lg:text-[13px] md:text-[16px] text-[12px] text-black">
-                                    {pairDetails.teamAGameStatus}
-                                  </td>
-                                  <td className="border border-black lg:px-2 lg:py-1 px-4 py-2 text-center font-roboto lg:text-[13px] md:text-[16px] text-[12px] text-black">
-                                    {pairDetails.teamBGameStatus}
-                                  </td>
-                                </tr>
-                                <tr className="bg-gray-50">
-                                  <td className="border border-black lg:px-2 lg:py-1 px-4 py-2 font-medium font-roboto lg:text-[13px] md:text-[16px] text-[12px] text-black">
-                                    Pair Status
-                                  </td>
-                                  <td className="border border-black lg:px-2 lg:py-1 px-4 py-2 text-center font-roboto lg:text-[13px] md:text-[16px] text-[12px] text-black">
-                                    {pairDetails.teamAPairStatus}
-                                  </td>
-                                  <td className="border border-black lg:px-2 lg:py-1 px-4 py-2 text-center font-roboto lg:text-[13px] md:text-[16px] text-[12px] text-black">
-                                    {pairDetails.teamBPairStatus}
-                                  </td>
-                                </tr>
-                              </tbody>
-                            </table>
-                          </div>
-                        )}
-
-                        {/* Fallback to old format if no detailed pair data */}
-                        {!pairDetails && gameCompleteResults && (
-                          <div className="grid sm:grid-cols-2 grid-cols-1 lg:mt-2 mt-4">
-                            <div className="lg:px-3 lg:py-2 px-4 py-4">
-                              <h4 className="font-roboto font-bold lg:text-[18px] md:text-[24px] text-[20px] text-black">
-                                Team A
-                              </h4>
-                              <div className="lg:px-4 lg:py-2 lg:space-y-1 px-6 py-4 space-y-2">
-                                <p className="font-bold font-roboto lg:text-[15px] md:text-[20px] text-[16px] text-black">
-                                  Health: {gameCompleteResults.teamAHealth?.toFixed(1) || 'N/A'}%
-                                </p>
-                                <p className="font-bold font-roboto lg:text-[15px] md:text-[20px] text-[16px] text-black">
-                                  Budget: ${gameCompleteResults.teamABudget?.toFixed(0) || 'N/A'}
-                                </p>
-                                <p className="font-bold font-roboto lg:text-[15px] md:text-[20px] text-[16px] text-black">
-                                  CO2: {gameCompleteResults.teamACO2?.toFixed(1) || 'N/A'} tons
-                                </p>
-                              </div>
-                            </div>
-                            <div className="lg:px-3 lg:py-2 px-4 py-4">
-                              <h4 className="font-roboto font-bold lg:text-[18px] md:text-[24px] text-[20px] text-black">
-                                Team B
-                              </h4>
-                              <div className="lg:px-4 lg:py-2 lg:space-y-1 px-6 py-4 space-y-2">
-                                <p className="font-bold font-roboto lg:text-[15px] md:text-[20px] text-[16px] text-black">
-                                  Health: {gameCompleteResults.teamBHealth?.toFixed(1) || 'N/A'}%
-                                </p>
-                                <p className="font-bold font-roboto lg:text-[15px] md:text-[20px] text-[16px] text-black">
-                                  Budget: ${gameCompleteResults.teamBBudget?.toFixed(0) || 'N/A'}
-                                </p>
-                                <p className="font-bold font-roboto lg:text-[15px] md:text-[20px] text-[16px] text-black">
-                                  CO2: {gameCompleteResults.teamBCO2?.toFixed(1) || 'N/A'} tons
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="lg:px-3 lg:py-2 px-4 py-4 text-center border-t border-black">
-                          <p className="font-bold font-roboto lg:text-[18px] md:text-[24px] text-[20px] text-black">
-                            Final Pair Score:{' '}
-                            {(
-                              pairDetails?.averagePairHealth ??
-                              gameCompleteResults?.pairAverageHealth
-                            )?.toFixed(1) || 'N/A'}
-                            %
-                          </p>
-                          {pairDetails && (
-                            <p className="font-medium font-roboto lg:text-[14px] md:text-[18px] text-[14px] text-gray-600 lg:mt-1 mt-2">
-                              Overall Status: {pairDetails.status}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    )}
+                  </div>
+                  <div className="flex justify-end mt-auto">
+                    <div>
+                      <p className="font-roboto lg:text-[14px] md:text-[18px] text-[12px] text-black-500">
+                        Room Code: {lobbyCode || '-'}
+                      </p>
+                      <p className="font-roboto lg:text-[14px] md:text-[18px] text-[12px] text-black-500 mt-1">
+                        Course Code: SEE1003
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
