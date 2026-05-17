@@ -1,55 +1,60 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+```markdown
+# Besse Frontend
+
+This repository contains the frontend application for the **Besse** project, built with [Next.js](https://nextjs.org/).
+
+---
+
+## Prerequisites
+
+Before running the application, ensure you have the following installed:
+* **Node.js** (v18.x or latest LTS recommended)
+* **npm** (comes bundled with Node.js)
+
+---
 
 ## Getting Started
 
-
-
-//"build": "next build && cp -r .next/static .next/standalone/.next/static && cp -r public .next/standalone/public",
-    "start": "next start -p $PORT",
-
-
-
-
-First, run the development server:
-
-
+### Step 1: Install Dependencies
+Navigate into the project root directory and install the required packages:
 ```bash
+cd Besse-frontend
 npm install next react react-dom
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Step 2: Environment Configuration
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Place the `.env` file in the root directory (`/Besse-frontend`) to store your environment variables.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## Running the Application
 
-To learn more about Next.js, take a look at the following resources:
+### Development Environment
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+To spin up the local development server with hot-reloading:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm run dev
 
-## Deploy on Vercel
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Once started, open [http://localhost:3000] in your browser.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Production Environment
 
-<!--
-"use client";
+To build the application for production and launch the optimized server:
 
-import React from "react";
+```bash
+npm run build
+npm run start
 
-export const Login: React.FC = () => {
-  return <div>login</div>;
-}; -->
+```
+
+The production server will also host the application locally at [http://localhost:3000]
+
+**You might want to test with the production environment for a quicker response environment
+
+```
+
+```
