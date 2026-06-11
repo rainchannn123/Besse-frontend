@@ -28,7 +28,6 @@ export default function Page() {
   const { login, isAuthenticated, user, initializeAuth } = useAuthStore();
   const { addNotification } = useNotificationStore();
 
-  // Initialize auth and check if user is already logged in
   useEffect(() => {
     initializeAuth();
   }, [initializeAuth]);
@@ -41,13 +40,10 @@ export default function Page() {
         router.push(getLobbyRoute(response.data.lobbyState, user?._id));
       }
     } catch {
-      // Lobby no longer exists (game already started or session expired)
-      // Redirect to dashboard — the game pages will handle active sessions
       router.push('/dashboard/besse-group');
     }
   };
 
-  // Redirect if already authenticated
   useEffect(() => {
     const redirectUser = async () => {
       if (isAuthenticated && !user?.currentSession) {
@@ -73,7 +69,6 @@ export default function Page() {
     try {
       const identity = (data.email || data.name || '').trim();
 
-      // Hidden admin path: only succeeds with server-side configured credentials.
       try {
         const adminResponse = await adminService.login(identity, data.password);
         if (adminResponse.success) {
@@ -93,10 +88,6 @@ export default function Page() {
         password: data.password,
       });
 
-      // addNotification({
-      //   message: 'Login successful! Redirecting...',
-      //   type: 'success',
-      // });
     } catch (error: any) {
       console.error('Login error:', error);
 
@@ -144,7 +135,6 @@ export default function Page() {
                         name="name"
                         control={control}
                         label="Email"
-                        // rules={{ required: "Name is required" }}
                       />
                     </div>
 

@@ -1,5 +1,6 @@
 'use client';
 
+import MRFAnalytics from '@/components/ui/mrfAnalytics/MRFAnalytics';
 import MunicipalityCustomHeader from '@/components/layout/header/customheader/MunicipalityCustomHeader';
 import GameModeBadge from '@/components/ui/GameModeBadge';
 import { MRFCollect } from '@/components/ui/MRFCollect/MRFCollect';
@@ -26,7 +27,7 @@ export default function MRFCollectionPage() {
   const { user } = useAuthStore();
   const { addNotification } = useNotificationStore();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'collection' | 'inventory' | 'pending-auctions'>(
+  const [activeTab, setActiveTab] = useState<'collection' | 'analytics' | 'pending'>(
     'collection'
   );
   const [gameState, setGameState] = useState<GameState | null>(null);
@@ -47,9 +48,8 @@ export default function MRFCollectionPage() {
   );
   const { getCurrentGameSession, notifications, isConnected, subscribe, joinGame, emit } = useWebSocket();
 
-  // console.log({ currentGame: getCurrentGameSession(), notifications });
-
   const currentGameState = gameState;
+  
   const fetchGameState = async () => {
     if (!user?.currentSession) {
       setError('No active session found');
@@ -61,7 +61,6 @@ export default function MRFCollectionPage() {
       const response = await gameService.getGameState(user.currentSession);
       if (response.success && response.data) {
         setGameState(response.data.gameState);
-        // Store init_state and current_game_session in localStorage
         if (
           response.data.gameState.gameStatus === 'complete' ||
           response.data.gameState.gameStatus === 'won' ||
@@ -98,11 +97,10 @@ export default function MRFCollectionPage() {
     try {
       const response = await mrfService.getMRFInventory(user.currentSession);
       if (response.success && response.data) {
-        const notListInventory = response.data.inventory.filter(
-          (item) => item.owner === 'mrf' && !item.listed
+        const allInventory = response.data.inventory.filter(
+          (item) => item.owner === 'mrf'
         );
-        // console.log('Fetched MRF Inventory:', notListInventory);
-        setInventory(notListInventory);
+        setInventory(allInventory);
       }
     } catch (err: any) {
       console.error('Failed to fetch MRF inventory', err);
@@ -128,7 +126,6 @@ export default function MRFCollectionPage() {
     fetchPendingAuctions();
   }, []);
 
-  // Clear selected item when switching tabs
   useEffect(() => {
     setSelectedItem(null);
     setSelectedGrade('');
@@ -142,7 +139,6 @@ export default function MRFCollectionPage() {
     }
   }, [selectedItem]);
 
-  // Live log items from websocket events (system messages, player actions)
   const [liveLogItems, setLiveLogItems] = useState<
     {
       time: string;
@@ -151,33 +147,20 @@ export default function MRFCollectionPage() {
       type?: 'info' | 'warning' | 'error';
     }[]
   >([]);
-  // throttle helper refs for applying full state
   const lastAppliedRef = useRef<number>(0);
   const pendingPayloadRef = useRef<any | null>(null);
   const shiftStartTimeRef = useRef<number>(0);
 
-  // Join the user's current session when websocket connects
   useEffect(() => {
     if (user?.currentSession && isConnected) {
-      // console.log('MRF Collection page: Calling joinGame with sessionId:', user.currentSession);
       joinGame(user.currentSession);
-    } else {
-      // console.log(
-      //   'MRF Collection page: Not joining yet - user.currentSession:',
-      //   user?.currentSession,
-      //   'isConnected:',
-      //   isConnected
-      // );
     }
   }, [user?.currentSession, isConnected, joinGame]);
 
-  // Subscribe to realtime events
   useEffect(() => {
-    // Game state updates
     const unsubGameStateUpdate = subscribe('game-state-update', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
-        // Check if game is over
         if (
           data.gameState.gameStatus === 'won' ||
           data.gameState.gameStatus === 'lost' ||
@@ -188,11 +171,9 @@ export default function MRFCollectionPage() {
       }
     });
 
-    // Full game state with computed extras (authoritative source)
     const unsubGameStateFull = subscribe('game-state-full', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
-        // Check if game is over
         if (
           data.gameState.gameStatus === 'won' ||
           data.gameState.gameStatus === 'lost' ||
@@ -202,7 +183,6 @@ export default function MRFCollectionPage() {
         }
       }
       if (data?.realtimeUpdate) {
-        // Handle realtime update data if needed
       }
       if (data?.turnSummary) setTurnSummary(data.turnSummary);
       if (data?.statistics) setStatistics(data.statistics);
@@ -211,57 +191,44 @@ export default function MRFCollectionPage() {
       setLastActionType(data?.actionType || null);
     });
 
-    // System check updates (30s interval)
     const unsubSystemCheckUpdate = subscribe('system-check-update', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
       }
     });
 
-    // Turn ended
     const unsubTurnEnded = subscribe('turn-ended', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
       }
     });
 
-    // Handle all game actions via game-state-updated event with actionType
     const unsubGameActions = subscribe('game-state-updated', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
       }
 
-      // Handle specific actions based on actionType
       const actionType = data?.actionType;
       if (actionType === 'waste-collected') {
-        // console.log('[MRF Collection] Waste collected - refreshing queue and inventory');
         fetchQueue();
       } else if (actionType === 'waste-processed') {
-        // console.log('[MRF Collection] Waste processed - refreshing queue and inventory');
         fetchQueue();
+        fetchInventory();
         fetchPendingAuctions();
       } else if (actionType === 'material-graded') {
-        // console.log('[MRF Collection] Material graded - refreshing inventory and auctions');
-
+        fetchInventory();
         fetchPendingAuctions();
       } else if (actionType === 'material-sold-external' || actionType === 'material-transferred') {
-        // console.log(`[MRF Collection] ${actionType} - refreshing inventory`);
         fetchInventory();
       } else if (actionType === 'auction-updated') {
-        // console.log('[MRF Collection] Auction updated - refreshing pending auctions');
         fetchPendingAuctions();
+        fetchInventory();
       }
     });
 
-    // COUNTDOWN EXPIRED EVENT - ADDED
     const unsubCountdownExpired = subscribe('countdown-expired', (data: any) => {
-      // console.log('Countdown expired received in MRF page:', data);
-
-      // Update game state if provided
       if (data?.gameState) {
         setGameState(data.gameState);
-
-        // Check if game is over
         if (
           data.gameState.gameStatus === 'won' ||
           data.gameState.gameStatus === 'lost' ||
@@ -269,35 +236,26 @@ export default function MRFCollectionPage() {
         ) {
           setTimeout(() => {
             router.push('/dashboard/game-over');
-          }, 3000); // Redirect after 3 seconds
+          }, 3000);
         }
       }
-
-      // Refresh queue, inventory and pending auctions
       fetchQueue();
       fetchInventory();
       fetchPendingAuctions();
     });
 
-    // COUNTDOWN STARTED EVENT - ADDED
     const unsubCountdownStarted = subscribe('countdown-started', (data: any) => {
-      // console.log('Countdown started received in MRF page:', data);
-      // Update game state if provided to start the countdown
       if (data?.gameState) {
         setGameState(data.gameState);
       }
     });
 
-    // COUNTDOWN CANCELLED EVENT - ADDED
     const unsubCountdownCancelled = subscribe('countdown-cancelled', (data: any) => {
-      // console.log('Countdown cancelled received in MRF page:', data);
-      // Update game state if provided to clear the countdown
       if (data?.gameState) {
         setGameState(data.gameState);
       }
     });
 
-    // Player actions for live log
     const unsubPlayerAction = subscribe('player-action', (data: any) => {
       const st = shiftStartTimeRef.current;
       const elapsed = st ? Math.max(0, Date.now() - new Date(st).getTime()) : 0;
@@ -313,20 +271,7 @@ export default function MRFCollectionPage() {
       setLiveLogItems((prev) => [...prev, { time, message, isLive: true }].slice(-100));
     });
 
-    // TEMPORARILY COMMENTED OUT - system messages for live log
-    const unsubSystemMessage = subscribe('system-message', (_data: any) => {
-      // const st = shiftStartTimeRef.current;
-      // const elapsed = st ? Math.max(0, Date.now() - new Date(st).getTime()) : 0;
-      // let durationMin = 15;
-      // try { const stored = localStorage.getItem('init_state'); if (stored) { const p = JSON.parse(stored); if (p?.constants?.REAL_TIME_GAME_DURATION_MINUTES) durationMin = p.constants.REAL_TIME_GAME_DURATION_MINUTES; } } catch {}
-      // const remainingMs = Math.max(0, durationMin * 60 * 1000 - elapsed);
-      // const mins = Math.floor(remainingMs / 60000);
-      // const secs = Math.floor((remainingMs % 60000) / 1000);
-      // const time = `[${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}]`;
-      // setLiveLogItems((prev) =>
-      //   [...prev, { time, message: data.message, isLive: true, type: data.type }].slice(-100)
-      // );
-    });
+    const unsubSystemMessage = subscribe('system-message', (_data: any) => {});
 
     const unsubSurrenderUpdate = subscribe('surrender-update', (data: any) => {
       if (data?.surrenderVotes) {
@@ -340,16 +285,15 @@ export default function MRFCollectionPage() {
       unsubSystemCheckUpdate && unsubSystemCheckUpdate();
       unsubTurnEnded && unsubTurnEnded();
       unsubGameActions && unsubGameActions();
-      unsubCountdownExpired && unsubCountdownExpired(); // Added cleanup
-      unsubCountdownStarted && unsubCountdownStarted(); // Added cleanup
-      unsubCountdownCancelled && unsubCountdownCancelled(); // Added cleanup
+      unsubCountdownExpired && unsubCountdownExpired();
+      unsubCountdownStarted && unsubCountdownStarted();
+      unsubCountdownCancelled && unsubCountdownCancelled();
       unsubPlayerAction && unsubPlayerAction();
       unsubSystemMessage && unsubSystemMessage();
       unsubSurrenderUpdate && unsubSurrenderUpdate();
     };
   }, [subscribe, router, fetchQueue, fetchInventory, fetchPendingAuctions]);
 
-  // Compute countdown-style timestamps for static logs
   const getDurationMinutes = () => {
     const c = currentGameState?.constants as any;
     if (c?.REAL_TIME_GAME_DURATION_MINUTES) return c.REAL_TIME_GAME_DURATION_MINUTES;
@@ -360,27 +304,12 @@ export default function MRFCollectionPage() {
     return 15;
   };
   const totalDurMin = getDurationMinutes();
-  // TEMPORARILY COMMENTED OUT - static activity log messages
-  // const staticLogData =
-  //   currentGameState?.activityLog?.map((log, index) => {
-  //     const elapsedMin = ((index + 1) / (currentGameState.activityLog?.length || 1)) * (currentGameState.minutesElapsed || 0);
-  //     const remainMin = Math.max(0, totalDurMin - elapsedMin);
-  //     const remMins = Math.floor(remainMin);
-  //     const remSecs = Math.floor((remainMin - remMins) * 60);
-  //     return {
-  //       time: `[${String(remMins).padStart(2, '0')}:${String(remSecs).padStart(2, '0')}]`,
-  //       message: log,
-  //     };
-  //   })?.reverse() || [];
   const staticLogData: { time: string; message: string }[] = [];
 
-  // Use authoritative state from `fullPayload` when available
   const authoritativeState = fullPayload?.gameState ?? currentGameState;
 
-  // For formatted logs, merge static activity log with live websocket logs
   const logData = [...staticLogData, ...liveLogItems];
 
-  // Derived UI: combine summaries for display
   const stats =
     statistics ||
     (authoritativeState as any)?.statistics ||
@@ -395,7 +324,6 @@ export default function MRFCollectionPage() {
     ? Date.now() - (authoritativeState.minutesElapsed || 0) * 60 * 1000
     : 0;
 
-  // Keep ref in sync for use in websocket callbacks
   useEffect(() => {
     shiftStartTimeRef.current = typeof shiftStartTime === 'number' ? shiftStartTime : 0;
   }, [shiftStartTime]);
@@ -404,7 +332,6 @@ export default function MRFCollectionPage() {
     setLiveLogItems((prev) => [...prev, log].slice(-100));
   }, []);
 
-  // Filter waste batches that are in the MRF queue
   const availableBatches = ((gameState as any)?.wasteBatches || []).filter((batch: WasteBatch) =>
     queue.some((q) => q.batchId === batch.id)
   );
@@ -526,7 +453,7 @@ export default function MRFCollectionPage() {
       });
     }
   };
-  // console.log(gameState);
+
   return (
     <div className="lg:h-full flex flex-col lg:overflow-hidden">
       <div className="bg-[#f3e9da] flex-1 flex flex-col lg:min-h-0 lg:overflow-hidden">
@@ -545,83 +472,104 @@ export default function MRFCollectionPage() {
               onStatusLog={handleStatusLog}
             />
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 flex-1 lg:min-h-0 lg:overflow-hidden">
-            {/* Left side */}
-            <div className="xl:col-span-3 lg:col-span-2 col-span-1 flex flex-col lg:min-h-0 lg:overflow-hidden">
-              <div
-                className="bg-cover bg-center mx-auto rounded-[20px] flex flex-col lg:min-h-0 overflow-hidden w-full flex-1"
-                style={{ backgroundImage: `url(${woodenBg.src})` }}
-              >
-                <MunicipalityCustomHeader
-                  backgroundImage={woodenHead.src}
-                  title={authoritativeState?.teamRole || currentGameState?.teamRole}
-                />
-                <GameModeBadge gameMode={gameMode} />
-                {/* Tab Navigation */}
-                <div className="flex justify-center mb-1 flex-shrink-0">
-                  <div className="bg-white rounded-lg p-1 shadow-md">
-                    <button
-                      onClick={() => setActiveTab('collection')}
-                      className={`px-4 py-1 rounded-md text-sm font-semibold transition-colors ${
-                        activeTab === 'collection'
-                          ? 'bg-[#3A7D2C] text-white'
-                          : 'text-gray-600 hover:bg-gray-100'
-                      }`}
-                    >
-                      Collection
-                    </button>
-                    <button
-                      onClick={() => setActiveTab('pending-auctions')}
-                      className={`px-4 py-1 rounded-md text-sm font-semibold transition-colors ${
-                        activeTab === 'pending-auctions'
-                          ? 'bg-[#3A7D2C] text-white'
-                          : 'text-gray-600 hover:bg-gray-100'
-                      }`}
-                    >
-                      Inventory
-                    </button>
-                  </div>
-                </div>
-                <div className="flex-1 lg:min-h-0 lg:overflow-hidden">
-                  {activeTab === 'collection' ? (
-                    <MRFCollectionSelectedBox
-                      key={availableBatches.map((b: WasteBatch) => b.id).join(',')}
-                      batches={availableBatches}
-                      selectedBatch={selectedItem as WasteBatch | null}
-                      setSelectedBatch={(batch) => setSelectedItem(batch)}
-                    />
-                  ) : (
-                    <MRFPendingAuctionSelectedBox
-                      key={pendingAuctions.map((a) => a.id).join(',')}
-                      auctions={pendingAuctions as PendingAuction[]}
-                      selectedAuction={selectedItem as PendingAuction | null}
-                      setSelectedAuction={(auction) => setSelectedItem(auction)}
-                    />
-                  )}
-                </div>
+          
+          {/* MAIN CONTENT - Takes full width on all tabs */}
+          <div
+            className="bg-cover bg-center mx-auto rounded-[20px] flex flex-col lg:min-h-0 overflow-hidden w-full flex-1"
+            style={{ backgroundImage: `url(${woodenBg.src})` }}
+          >
+            <MunicipalityCustomHeader
+              backgroundImage={woodenHead.src}
+              title={authoritativeState?.teamRole || currentGameState?.teamRole}
+            />
+            <GameModeBadge gameMode={gameMode} />
+            
+            {/* Tab Navigation */}
+            <div className="flex justify-center mb-3 flex-shrink-0 mt-2">
+              <div className="bg-white rounded-lg p-1 shadow-md flex gap-1">
+                <button
+                  onClick={() => setActiveTab('collection')}
+                  className={`px-6 py-2 rounded-md text-sm font-semibold transition-colors ${
+                    activeTab === 'collection'
+                      ? 'bg-[#3A7D2C] text-white'
+                      : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  Collection
+                </button>
+                <button
+                  onClick={() => setActiveTab('analytics')}
+                  className={`px-6 py-2 rounded-md text-sm font-semibold transition-colors ${
+                    activeTab === 'analytics'
+                      ? 'bg-[#3A7D2C] text-white'
+                      : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  Analytics
+                </button>
+                <button
+                  onClick={() => setActiveTab('pending')}
+                  className={`px-6 py-2 rounded-md text-sm font-semibold transition-colors ${
+                    activeTab === 'pending'
+                      ? 'bg-[#3A7D2C] text-white'
+                      : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  Materials Ready
+                </button>
               </div>
             </div>
-            {/* Right side */}
-            <div className="xl:col-span-1 lg:col-span-2 col-span-1 lg:overflow-y-auto lg:min-h-0">
-              {activeTab === 'collection' ? (
-                selectedItem && 'status' in selectedItem ? (
-                  <MRFCollect
-                    budget={authoritativeState?.budget ?? currentGameState?.budget}
-                    totalCO2={authoritativeState?.totalCO2 ?? (currentGameState?.totalCO2 || 0)}
-                    selectedItem={selectedItem}
-                    handleProcessWaste={handleProcessWaste}
-                  />
-                ) : null
-              ) : activeTab === 'pending-auctions' && selectedItem ? (
-                <PendingAuctionAction
-                  selectedAuction={selectedItem}
-                  handleAssignGradeAndPrice={handleAssignGradeAndPrice}
+            
+            {/* CONTENT AREA - Changes based on active tab */}
+            <div className="flex-1 lg:min-h-0 lg:overflow-y-auto p-4">
+              {activeTab === 'collection' && (
+                <MRFCollectionSelectedBox
+                  key={availableBatches.map((b: WasteBatch) => b.id).join(',')}
+                  batches={availableBatches}
+                  selectedBatch={selectedItem as WasteBatch | null}
+                  setSelectedBatch={(batch) => setSelectedItem(batch)}
                 />
-              ) : null}
+              )}
+              
+              {activeTab === 'analytics' && (
+                <MRFAnalytics
+                  wasteBatches={gameState?.wasteBatches || []}
+                  inventory={inventory}
+                />
+              )}
+              
+              {activeTab === 'pending' && (
+                <MRFPendingAuctionSelectedBox
+                  key={pendingAuctions.map((a) => a.id).join(',')}
+                  auctions={pendingAuctions as PendingAuction[]}
+                  selectedAuction={selectedItem as PendingAuction | null}
+                  setSelectedAuction={(auction) => setSelectedItem(auction)}
+                />
+              )}
             </div>
           </div>
         </div>
       </div>
+      
+      {/* RIGHT SIDE ACTION PANEL - Fixed position on the right side of screen */}
+      <div className="fixed right-4 top-1/2 transform -translate-y-1/2 z-10 w-80">
+        {activeTab === 'collection' && selectedItem && 'status' in selectedItem && (
+          <MRFCollect
+            budget={authoritativeState?.budget ?? currentGameState?.budget}
+            totalCO2={authoritativeState?.totalCO2 ?? (currentGameState?.totalCO2 || 0)}
+            selectedItem={selectedItem}
+            handleProcessWaste={handleProcessWaste}
+          />
+        )}
+        
+        {activeTab === 'pending' && selectedItem && (
+          <PendingAuctionAction
+            selectedAuction={selectedItem}
+            handleAssignGradeAndPrice={handleAssignGradeAndPrice}
+          />
+        )}
+      </div>
+      
       <SurrenderButton
         playerId={user?._id ?? ''}
         surrenderVotes={authoritativeState?.surrenderVotes ?? []}
