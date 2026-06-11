@@ -131,7 +131,7 @@ export default function Page() {
           <div>
             <WelcomeBesse></WelcomeBesse>
             <div
-              className="bg-cover bg-center pt-14  xl:w-[1289px]  lg:w-[1000px] md:w-[800px]  sm:w-[600px] w-full  mx-auto rounded-[20px] sm:px-0 px-8 sm:mx-0 "
+              className="bg-cover bg-center pt-14  xl:w-[1289px]  lg:w-[1000px]  md:w-[800px]  sm:w-[600px] w-full  mx-auto rounded-[20px] sm:px-0 px-8 sm:mx-0 "
               style={{
                 backgroundImage: `url(${woodenBg.src})`,
               }}
@@ -191,7 +191,8 @@ export default function Page() {
                     </button>
                   </form>
 
-                  <div className="mt-4 text-center mb-10">
+                  {/* Register link - HIDDEN with CSS but code remains intact */}
+                  <div className="mt-4 text-center mb-10 hidden">
                     <span className="greenTextColor font-regular md:text-[20px] text-[16px]">
                       Don't have an account?
                     </span>
