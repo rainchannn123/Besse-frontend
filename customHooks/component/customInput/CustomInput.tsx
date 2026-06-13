@@ -42,19 +42,21 @@ const CustomInput: React.FC<CustomInputProps> = ({
   const inputType = type === 'password' && showPassword ? 'text' : type;
 
   return (
-    <div className={`flex flex-col w-full mb-4 relative ${className || ''}`}>
+    <div className={`flex flex-col w-full min-w-0 mb-4 relative ${className || ''}`}>
       {label && (
-        <label className="mb-2 block text-[30px] font-medium greenTextColor">{label}</label>
+        <label className="mb-2 block text-[20px] md:text-[24px] font-semibold text-[#f3f7f2] tracking-[0.01em] drop-shadow-[0_1px_2px_rgba(0,0,0,0.55)]">{label}</label>
       )}
 
-      <div className="relative">
+      <div className="relative w-full min-w-0">
         <input
           {...field}
           type={inputType}
           placeholder={placeholder}
           onChange={handleChange}
-          className={`px-4 focus:outline-none focus:ring-0 lg:w-[682px] md:w-[550px]  sm:w-[500px]  w-full flex items-center h-[60px] border borderColor bg-white rounded-none shadow-sm transition duration-150 ease-in-out text-base placeholder:text-[#000000] placeholder:text-[26px] ${
-            error ? 'border-red-500 focus:ring-red-300' : 'border-gray-300 focus:ring-blue-300'
+          className={`w-full max-w-full min-w-0 px-4 pr-12 focus:outline-none h-[56px] md:h-[60px] border bg-[#f6fbf8] rounded-md shadow-[inset_0_1px_1px_rgba(0,0,0,0.06)] transition duration-150 ease-in-out text-[#1f2b22] text-base placeholder:text-[#5f6d63] placeholder:text-[16px] md:placeholder:text-[18px] ${
+            error
+              ? 'border-red-400 focus:ring-2 focus:ring-red-300'
+              : 'border-[#b7c8bd] focus:ring-2 focus:ring-[#9ed7b4]'
           }`}
         />
 

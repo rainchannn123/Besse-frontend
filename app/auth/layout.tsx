@@ -1,6 +1,5 @@
 'use client';
 
-import { Footer } from '@/components/layout/footer/Footer';
 import { Header } from '@/components/layout/header/Header';
 import { NotificationCenter } from '@/components/ui/notifications/NotificationCenter';
 import { useNotificationStore } from '@/stores/notificationStore';
@@ -20,7 +19,6 @@ export default function AuthLayout({
         notifications={notifications}
         onDismiss={removeNotification}
       />
-      <Footer />
     </div>
   );
 }

@@ -43,6 +43,7 @@ export default function AdminMonitorPage() {
   const [historyRecords, setHistoryRecords] = useState<Record<string, AdminPlayerGameRecord[]>>({});
   const [historyLoading, setHistoryLoading] = useState<string | null>(null);
   const [showRegistrationModal, setShowRegistrationModal] = useState(false);
+  const isAdminAuthenticated = adminService.hasToken();
 
   const loadOverview = async (silent = false) => {
     if (!adminService.hasToken()) {
@@ -108,14 +109,18 @@ export default function AdminMonitorPage() {
   }, [overview, search, statusFilter]);
 
   const handleForceExit = async (player: AdminPlayerRow) => {
+    if (!isAdminAuthenticated) {
+      addNotification({
+        message: 'Admin authorization required',
+        type: 'error',
+      });
+      router.push('/auth/login');
+      return;
+    }
+
     try {
       setActionLoadingUserId(player.userId);
       await adminService.forceExitPlayer(player.userId, 'Admin manual reset for bug recovery');
-
-      addNotification({
-        message: `${player.name} has been reset to out-of-game status`,
-        type: 'success',
-      });
 
       setOverview(prev => {
         if (!prev) return prev;
@@ -354,7 +359,7 @@ export default function AdminMonitorPage() {
                         <td className="px-3 py-3 align-top space-y-2">
                           <button
                             onClick={() => handleForceExit(player)}
-                            disabled={!player.currentSession || actionLoadingUserId === player.userId}
+                            disabled={!isAdminAuthenticated || !player.currentSession || actionLoadingUserId === player.userId}
                             className="rounded-md bg-[#9e3f2e] px-3 py-2 text-xs text-white font-semibold disabled:cursor-not-allowed disabled:opacity-40 w-full"
                           >
                             {actionLoadingUserId === player.userId ? 'Resetting...' : 'Force Out'}
