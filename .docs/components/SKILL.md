@@ -13,6 +13,7 @@ Reusable UI units, feature widgets, and layout components.
 - Prefer composition over duplication.
 - Keep business logic outside presentational components; move to hooks/services.
 - Align styling patterns with existing component conventions.
+- New interactive UI components such as `GameChatbot` should be placed under `components/ui/` and mounted only on the gameplay pages that need them.
 
 ## Debug Heuristics
 - Visual bug: inspect component props + parent usage in route page.

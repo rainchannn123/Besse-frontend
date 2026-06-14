@@ -8,6 +8,7 @@ import { MunicipalityWasteSelectedBox } from '@/components/ui/selectedBox/Munici
 import ShiftLog from '@/components/ui/shiftLog/ShiftLog';
 import { WasteCollectAction } from '@/components/ui/wasteCollectAction/WasteCollectAction';
 import { SurrenderButton } from '@/components/ui/surrenderButton/SurrenderButton';
+import GameChatbot from '@/components/ui/chatbot/GameChatbot';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import woodenBg from '@/public/assets/images/wooden_bg.png';
 import woodenHead from '@/public/assets/images/woodenHead.png';
@@ -716,6 +717,7 @@ export default function MunicipalityPage() {
         canSurrender={canSurrender}
         onToggle={handleSurrenderToggle}
       />
+      <GameChatbot pageContext="municipality" />
     </div>
   );
 }

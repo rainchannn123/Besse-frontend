@@ -6,6 +6,7 @@ import { BrokerExternalWholesalerSelectedBox } from '@/components/ui/selectedBox
 import { BrokerGlobalAuctionSelectedBox } from '@/components/ui/selectedBox/BrokerGlobalAuctionSelectedBox';
 import ShiftLog from '@/components/ui/shiftLog/ShiftLog';
 import { SurrenderButton } from '@/components/ui/surrenderButton/SurrenderButton';
+import GameChatbot from '@/components/ui/chatbot/GameChatbot';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import woodenBg from '@/public/assets/images/wooden_bg.png';
 import woodenHead from '@/public/assets/images/woodenHead.png';
@@ -525,6 +526,7 @@ export default function BrokerInventoryPage() {
           if (user?.currentSession) emit('surrender-toggle', { sessionId: user.currentSession });
         }}
       />
+      <GameChatbot pageContext="broker-inventory" />
     </div>
   );
 }

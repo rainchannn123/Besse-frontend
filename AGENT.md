@@ -24,6 +24,7 @@ Next.js App Router pages/layouts.
 ### `components/`
 Reusable presentational and composite UI components.
 - `components/ui/` contains feature-specific UI modules.
+- `components/ui/chatbot/GameChatbot.tsx`: Floating chat widget mounted on three game pages (mrf-collection, broker-inventory, municipality). Features: page-specific welcome messages, markdown rendering of assistant replies, user message plain text, floating icon at bottom-right with expand/collapse animation.
 - `components/layout/` contains header/footer and layout primitives.
 
 ### `config/`
@@ -50,6 +51,7 @@ Static assets.
 ### `services/`
 API service layer.
 - Feature-based HTTP client functions aligned with backend domains.
+- **Chatbot service** (`chatbotService.ts`): Handles REST calls to backend `/api/chatbot/*` endpoints. Sends user messages with page context (mrf-collection, broker-inventory, municipality) and receives markdown-formatted LLM responses via RAG vectorstore retrieval.
 
 ### `stores/`
 Global client-side state stores.
@@ -69,6 +71,7 @@ Reusable pure utility logic.
 - Realtime issue: inspect `hooks/useWebSocket.ts` + `lib/websocket/socketManager.ts`.
 - Auth/session issue: inspect `stores/authStore.ts`, `services/authService.ts`, and route layouts in `app/auth` and protected dashboard areas.
 - Pairing/game flow issue: inspect `hooks/usePairingSystem.ts`, `hooks/usePairingGuard.tsx`, and corresponding dashboard pages.
+- **Chatbot issue**: Check `components/ui/chatbot/GameChatbot.tsx` (frontend widget, markdown rendering, context switching) → `services/chatbotService.ts` (API wrapper, message send logic) → backend `/api/chatbot/*` endpoints.
 
 ## Safe-Change Checklist
 - Trace flow end-to-end: page/component → hook/store → service → backend contract.
