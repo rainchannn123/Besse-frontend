@@ -24,7 +24,7 @@ export default function MunicipalityPage() {
   const { user } = useAuthStore();
   const { addNotification } = useNotificationStore();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'waste-collection' | 'city-projects'>(
+  const [activeTab, setActiveTab] = useState<'waste-collection' | 'city-projects' | 'project-details'>(
     'waste-collection'
   );
   const [gameState, setGameState] = useState<GameState | null>(null);
@@ -639,6 +639,21 @@ export default function MunicipalityPage() {
                     >
                       Inventory
                     </button>
+                    <button
+                      onClick={() => {
+                        setActiveTab('project-details');
+                        setSelectedItem(null);
+                        setSelectedMaterial(null);
+                        setSelectedProject(null);
+                      }}
+                      className={`px-4 py-1 rounded-md text-sm font-semibold transition-colors ${
+                        activeTab === 'project-details'
+                          ? 'bg-[#3A7D2C] text-white'
+                          : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      Project Details
+                    </button>
                   </div>
                 </div>
                 <div className="flex-1 lg:min-h-0 lg:overflow-hidden">
@@ -657,7 +672,7 @@ export default function MunicipalityPage() {
                         setSelectedProject(null);
                       }}
                     />
-                  ) : (
+                  ) : activeTab === 'city-projects' ? (
                     <MunicipalityMaterialSelectedBox
                       key={selectableMaterials.map((m) => m.id).join(',')}
                       materials={selectableMaterials}
@@ -672,6 +687,51 @@ export default function MunicipalityPage() {
                         setSelectedProject(null);
                       }}
                     />
+                  ) : (
+                    <div className="h-full px-3 pb-3 overflow-y-auto">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {cityProjects.map((project) => (
+                          <div
+                            key={project.id}
+                            className="bg-white/95 rounded-xl border border-[#C7B292] shadow-sm p-3"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <h3 className="text-[16px] font-bold text-[#3f2c1b] leading-tight">
+                                {project.name}
+                              </h3>
+                              <span
+                                className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${
+                                  project.completed
+                                    ? 'bg-[#D9F3D6] text-[#2B6B2F]'
+                                    : 'bg-[#F2E7D8] text-[#7A5A34]'
+                                }`}
+                              >
+                                {project.completed ? 'Completed' : 'Available'}
+                              </span>
+                            </div>
+                            <p className="text-[12px] text-[#5c4733] mt-1">
+                              {project.description || 'City sustainability development project.'}
+                            </p>
+
+                            <div className="mt-2 border-t border-[#E5D7C1] pt-2">
+                              <p className="text-[12px] font-semibold text-[#4a3722] mb-1">
+                                Required Materials
+                              </p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {Object.entries(project.requiredMaterials).map(([material, qty]) => (
+                                  <span
+                                    key={`${project.id}-${material}`}
+                                    className="inline-flex items-center rounded-md bg-[#F7F2EA] px-2 py-1 text-[11px] font-medium text-[#5a442b] border border-[#E6D8C2]"
+                                  >
+                                    {material}: {Number(qty || 0).toFixed(1)}t
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>

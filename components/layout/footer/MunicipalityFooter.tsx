@@ -32,7 +32,7 @@ export const MunicipalityFooter: React.FC<MunicipalityFooterProps> = ({
             </div>
             <div className="flex items-center">
               <p className="text-regular text-[15px] font-roboto text-[#000000]">
-                Budget ${Number(budget).toFixed(2)}
+                Wallet ${Number(budget).toFixed(2)}
               </p>
             </div>
           </div>

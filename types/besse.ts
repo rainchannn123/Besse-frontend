@@ -631,7 +631,7 @@ export interface PlaceOrderResponse
 export interface CityProject {
   id: string;
   name: string;
-  requiredMaterials: Partial<Record<MaterialType, number>>;
+  description?: string;
   addedMaterials?: Partial<Record<MaterialType, number>>;
   progress: number;
   completed: boolean;
