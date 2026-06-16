@@ -244,46 +244,45 @@ export default function GameChatbot({ pageContext }: GameChatbotProps) {
   return (
     <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end gap-3 pointer-events-none">
       <div
-        className={`pointer-events-auto w-[460px] max-w-[calc(100vw-1.5rem)] rounded-2xl border border-emerald-300 bg-white shadow-2xl transition-all duration-300 origin-bottom-right ${
+        className={`pointer-events-auto w-[460px] max-w-[calc(100vw-1.5rem)] rounded-2xl border border-[#50704C] bg-white shadow-2xl transition-all duration-300 origin-bottom-right ${
           open
             ? 'opacity-100 translate-y-0 scale-100'
             : 'opacity-0 translate-y-4 scale-95 invisible'
         }`}
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-emerald-200 bg-white rounded-t-2xl">
-          <h3 className="text-sm font-semibold text-emerald-900">Game Assistant</h3>
-          <button
-            onClick={() => setOpen(false)}
-            className="rounded-md p-1 text-emerald-800 hover:bg-emerald-100"
-            aria-label="Close chatbot"
-          >
-            <X size={16} />
-          </button>
-        </div>
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-[#50704C] bg-[#50704C] rounded-t-2xl" >
+          <h3 className="text-sm font-semibold text-white whitespace-nowrap">Game Assistant</h3>
 
-        <div className="px-3 pt-2 pb-1 bg-white border-b border-emerald-200">
-          <div className="inline-flex rounded-xl border border-emerald-200 bg-white p-1">
+          <div className="flex-1 flex items-center justify-center">
             <button
               onClick={() => setActiveTab('bot')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer border-2 border-[#466342] ${
                 activeTab === 'bot'
-                  ? 'bg-emerald-700 text-white'
-                  : 'text-emerald-800 hover:bg-emerald-100'
+                  ? 'bg-white text-[#50704C]'
+                  : 'text-white/90 hover:bg-white/20'
               }`}
             >
               Bot
             </button>
             <button
               onClick={() => setActiveTab('team')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer border-2 border-[#466342] ${
                 activeTab === 'team'
-                  ? 'bg-emerald-700 text-white'
-                  : 'text-emerald-800 hover:bg-emerald-100'
+                  ? 'bg-white text-[#50704C]'
+                  : 'text-white/90 hover:bg-white/20'
               }`}
             >
               Team
             </button>
           </div>
+
+          <button
+            onClick={() => setOpen(false)}
+            className="rounded-md p-1 text-white/90 hover:bg-white/20"
+            aria-label="Close chatbot"
+          >
+            <X size={16} />
+          </button>
         </div>
 
         <div ref={containerRef} className="h-[26rem] overflow-y-auto px-3 py-3 bg-white">
@@ -297,8 +296,8 @@ export default function GameChatbot({ pageContext }: GameChatbotProps) {
                   <div
                     className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm leading-relaxed ${
                       m.role === 'user'
-                        ? 'bg-emerald-700 text-white rounded-br-md'
-                        : 'bg-white text-gray-800 border border-emerald-200 rounded-bl-md'
+                        ? 'bg-[#50704C] text-white rounded-br-md'
+                        : 'bg-white text-gray-800 border border-[#50704C] rounded-bl-md'
                     }`}
                   >
                     {m.role === 'user' ? (
@@ -321,11 +320,11 @@ export default function GameChatbot({ pageContext }: GameChatbotProps) {
                     <div
                       className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm leading-relaxed ${
                         isMine
-                          ? 'bg-emerald-700 text-white rounded-br-md'
-                          : 'bg-white text-gray-800 border border-emerald-200 rounded-bl-md'
+                          ? 'bg-[#50704C] text-white rounded-br-md'
+                          : 'bg-white text-gray-800 border border-[#50704C] rounded-bl-md'
                       }`}
                     >
-                      <div className={`text-[10px] mb-1 ${isMine ? 'text-emerald-100' : 'text-emerald-700'}`}>
+                      <div className={`text-[10px] mb-1 ${isMine ? 'text-[#A8DADC]' : 'text-[#50704C]'}`}>
                         {m.senderName} - {m.senderRole}
                       </div>
                       <div>{m.message}</div>
@@ -336,7 +335,7 @@ export default function GameChatbot({ pageContext }: GameChatbotProps) {
 
             {activeTab === 'bot' && sending && (
               <div className="flex justify-start">
-                <div className="max-w-[80%] rounded-2xl px-3 py-2 text-sm bg-white text-gray-600 border border-emerald-200 rounded-bl-md">
+                <div className="max-w-[80%] rounded-2xl px-3 py-2 text-sm bg-white text-gray-600 border border-[#50704C] rounded-bl-md">
                   Typing...
                 </div>
               </div>
@@ -346,7 +345,7 @@ export default function GameChatbot({ pageContext }: GameChatbotProps) {
 
         {error && <div className="px-3 pt-2 text-xs text-red-600">{error}</div>}
 
-        <div className="p-3 border-t border-emerald-100 bg-white rounded-b-2xl">
+        <div className="p-3 border-t border-[#50704C] bg-white rounded-b-2xl">
           <div className="flex items-center gap-2">
             <input
               value={input}
@@ -358,13 +357,13 @@ export default function GameChatbot({ pageContext }: GameChatbotProps) {
                 }
               }}
               placeholder={activeTab === 'bot' ? 'Ask for game help...' : 'Message your team...'}
-              className="flex-1 rounded-xl border border-emerald-300 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-700"
+              className="flex-1 rounded-xl border border-[#50704C] bg-white px-3 py-2 text-sm outline-none focus:border-[#50704C]"
               maxLength={1000}
             />
             <button
               onClick={handleSend}
               disabled={!canSend}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-700 text-white disabled:opacity-50 hover:bg-emerald-800"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-[#50704C] text-white disabled:opacity-50 hover:bg-[#50704C]"
               aria-label="Send message"
             >
               <Send size={16} />
