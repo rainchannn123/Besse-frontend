@@ -24,7 +24,7 @@ Next.js App Router pages/layouts.
 ### `components/`
 Reusable presentational and composite UI components.
 - `components/ui/` contains feature-specific UI modules.
-- `components/ui/chatbot/GameChatbot.tsx`: Floating chat widget mounted on three game pages (mrf-collection, broker-inventory, municipality). Features: page-specific welcome messages, markdown rendering of assistant replies, user message plain text, floating icon at bottom-right with expand/collapse animation.
+- `components/ui/chatbot/GameChatbot.tsx`: Floating chat widget mounted on three game pages (mrf-collection, broker-inventory, municipality). Features: page-specific welcome messages, markdown rendering of assistant replies, user message plain text, floating icon at bottom-right with expand/collapse animation, teammate-only realtime team chat via websocket, and unread message badge on the launcher icon.
 - `components/layout/` contains header/footer and layout primitives.
 
 ### `config/`
@@ -72,6 +72,12 @@ Reusable pure utility logic.
 - Auth/session issue: inspect `stores/authStore.ts`, `services/authService.ts`, and route layouts in `app/auth` and protected dashboard areas.
 - Pairing/game flow issue: inspect `hooks/usePairingSystem.ts`, `hooks/usePairingGuard.tsx`, and corresponding dashboard pages.
 - **Chatbot issue**: Check `components/ui/chatbot/GameChatbot.tsx` (frontend widget, markdown rendering, context switching) → `services/chatbotService.ts` (API wrapper, message send logic) → backend `/api/chatbot/*` endpoints.
+- **Team chat sync issue**: Check `components/ui/chatbot/GameChatbot.tsx` websocket subscription and session join behavior (must subscribe from mount, not tab-open only), then verify backend event emission in `Besse-backend/src/services/websocketService.ts`.
+
+## Chatbot Lifecycle Notes
+- Initialization: `GameChatbot` should subscribe to `team-chat-message` immediately on mount and ensure room/session join is active for current game session.
+- Runtime sync: Team messages must be received regardless of active tab; tab switching should only affect read/unread state, not subscription.
+- Termination/reset: On session/page-context change and game end transitions, reset local team chat state and unread counts to prevent stale carryover.
 
 ## Safe-Change Checklist
 - Trace flow end-to-end: page/component → hook/store → service → backend contract.

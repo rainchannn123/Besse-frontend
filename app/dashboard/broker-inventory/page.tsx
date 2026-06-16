@@ -210,6 +210,22 @@ export default function BrokerInventoryPage() {
     }
   }, [user?.currentSession, isConnected, joinGame]);
 
+  // One-time per-session auto reload fallback to stabilize initial realtime setup
+  useEffect(() => {
+    const sessionId = user?.currentSession;
+    if (!sessionId) return;
+
+    const key = `role_page_reload_once_${sessionId}_broker`;
+    if (sessionStorage.getItem(key) === '1') return;
+
+    sessionStorage.setItem(key, '1');
+    const timer = window.setTimeout(() => {
+      window.location.reload();
+    }, 500);
+
+    return () => window.clearTimeout(timer);
+  }, [user?.currentSession]);
+
   useEffect(() => {
     const unsubGameStateUpdate = subscribe('game-state-update', (data: any) => {
       if (data?.gameState) {
@@ -441,91 +457,120 @@ export default function BrokerInventoryPage() {
   }
 
   return (
-    <div className="lg:h-full flex flex-col lg:overflow-hidden">
-      <div className="bg-[#f3e9da] flex-1 flex flex-col lg:min-h-0 lg:overflow-hidden">
-        <div className="container mx-auto sm:p-0 px-4 flex flex-col flex-1 lg:min-h-0 lg:overflow-hidden gap-3">
-          <div className="flex-shrink-0">
-            <ShiftLog
-              logs={logData}
-              shiftStart={shiftStart}
-              shiftStartTime={authoritativeState?.gameStartTime}
-              gameOverCountdown={authoritativeState?.gameOverCountdown}
-              onGameOver={() => router.push('/dashboard/game-over')}
-              cityHealth={authoritativeState?.cityHealth}
-              budget={authoritativeState?.budget}
-              totalCO2={authoritativeState?.totalCO2}
-              wasteInventory={authoritativeState?.wasteInventory}
-              onStatusLog={handleStatusLog}
-            />
-          </div>
-          <div className="grid grid-cols-1 gap-3 flex-1 lg:min-h-0 lg:overflow-hidden">
-            <div className="col-span-1 flex flex-col lg:min-h-0 lg:overflow-hidden">
-              <div
-                className="bg-cover bg-center mx-auto rounded-[20px] flex flex-col lg:min-h-0 overflow-hidden w-full flex-1"
-                style={{ backgroundImage: `url(${woodenBg.src})` }}
-              >
-                <MunicipalityCustomHeader
-                  backgroundImage={woodenHead.src}
-                  title={authoritativeState?.teamRole || currentGameState?.teamRole}
-                />
-                <GameModeBadge gameMode={gameMode} />
-                {/* Tab Navigation */}
-                <div className="flex justify-center mb-1 flex-shrink-0">
-                  <div className="bg-white rounded-lg p-1 shadow-md flex">
-                    <button
-                      onClick={() => setActiveTab('global-auctions')}
-                      className={`px-4 py-1 rounded-md text-sm font-semibold transition-colors ${
-                        activeTab === 'global-auctions'
-                          ? 'bg-[#3A7D2C] text-white'
-                          : 'text-gray-600 hover:bg-gray-100'
-                      }`}
-                    >
-                      Global Auctions
-                    </button>
-                    <button
-                      onClick={() => setActiveTab('external-wholesaler')}
-                      className={`px-4 py-1 rounded-md text-sm font-semibold transition-colors ${
-                        activeTab === 'external-wholesaler'
-                          ? 'bg-[#3A7D2C] text-white'
-                          : 'text-gray-600 hover:bg-gray-100'
-                      }`}
-                    >
-                      External Wholesaler
-                    </button>
-                  </div>
+    <div className="bg-[#f3e9da] min-h-screen flex flex-col pb-6 lg:pb-8">
+      <div className="container mx-auto sm:p-0 px-4 flex flex-col gap-3">
+        <div className="flex-shrink-0">
+          <ShiftLog
+            logs={logData}
+            shiftStart={shiftStart}
+            shiftStartTime={authoritativeState?.gameStartTime}
+            gameOverCountdown={authoritativeState?.gameOverCountdown}
+            onGameOver={() => router.push('/dashboard/game-over')}
+            cityHealth={authoritativeState?.cityHealth}
+            budget={authoritativeState?.budget}
+            totalCO2={authoritativeState?.totalCO2}
+            wasteInventory={authoritativeState?.wasteInventory}
+            onStatusLog={handleStatusLog}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_26rem] gap-3 items-start">
+          <div className="col-span-1 flex flex-col min-w-0">
+            <div
+              className="bg-cover bg-center mr-auto rounded-[20px] flex flex-col lg:min-h-0 lg:max-h-[calc(100vh-21rem)] overflow-hidden w-full flex-1"
+              style={{ backgroundImage: `url(${woodenBg.src})` }}
+            >
+              <MunicipalityCustomHeader
+                backgroundImage={woodenHead.src}
+                title={authoritativeState?.teamRole || currentGameState?.teamRole}
+              />
+              {/* <GameModeBadge gameMode={gameMode} /> */}
+
+              <div className="flex justify-center mb-1 flex-shrink-0">
+                <div className="bg-white rounded-lg p-1 shadow-md flex">
+                  <button
+                    onClick={() => setActiveTab('global-auctions')}
+                    className={`px-4 py-1 rounded-md text-sm font-semibold transition-colors ${
+                      activeTab === 'global-auctions'
+                        ? 'bg-[#3A7D2C] text-white'
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    Global Auctions
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('external-wholesaler')}
+                    className={`px-4 py-1 rounded-md text-sm font-semibold transition-colors ${
+                      activeTab === 'external-wholesaler'
+                        ? 'bg-[#3A7D2C] text-white'
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    External Wholesaler
+                  </button>
                 </div>
-                <div className="flex-1 lg:min-h-0 lg:overflow-hidden">
-                  {activeTab === 'global-auctions' ? (
-                    <BrokerGlobalAuctionSelectedBox
-                      auctions={globalAuctions}
-                      selectedAuction={selectedAuction}
-                      setSelectedAuction={setSelectedAuction}
-                      currentUserId={user?._id}
-                      onPlaceBid={handlePlaceBid}
-                    />
-                  ) : (
-                    <BrokerExternalWholesalerSelectedBox
-                      key={externalStock.map((s) => s.materialType).join(',')}
-                      stock={externalStock}
-                      selectedStock={selectedStock}
-                      setSelectedStock={setSelectedStock}
-                      onBuy={handleBuyFromWholesaler}
-                    />
-                  )}
-                </div>
+              </div>
+
+              <div className="flex-1 min-h-0 overflow-y-auto">
+                {activeTab === 'global-auctions' ? (
+                  <BrokerGlobalAuctionSelectedBox
+                    auctions={globalAuctions}
+                    selectedAuction={selectedAuction}
+                    setSelectedAuction={setSelectedAuction}
+                    currentUserId={user?._id}
+                    onPlaceBid={handlePlaceBid}
+                  />
+                ) : (
+                  <BrokerExternalWholesalerSelectedBox
+                    key={externalStock.map((s) => s.materialType).join(',')}
+                    stock={externalStock}
+                    selectedStock={selectedStock}
+                    setSelectedStock={setSelectedStock}
+                    onBuy={handleBuyFromWholesaler}
+                  />
+                )}
               </div>
             </div>
           </div>
+
+          {/* <div className="w-full xl:w-[26rem] xl:sticky xl:top-24 self-start max-h-[calc(100dvh-12rem)] overflow-y-auto pr-1">
+            {activeTab === 'global-auctions' ? (
+              selectedAuction ? (
+                <div className="bg-white/95 rounded-xl border border-[#C7B292] shadow-sm p-4 space-y-2">
+                  <h3 className="text-[15px] font-bold text-[#3f2c1b]">Selected Auction</h3>
+                  <p className="text-[12px] text-[#5c4733]"><span className="font-semibold">Material:</span> {selectedAuction.materialType}</p>
+                  <p className="text-[12px] text-[#5c4733]"><span className="font-semibold">Grade:</span> {selectedAuction.grade}</p>
+                  <p className="text-[12px] text-[#5c4733]"><span className="font-semibold">Mass:</span> {Number(selectedAuction.mass || 0).toFixed(1)}t</p>
+                  <p className="text-[12px] text-[#5c4733]"><span className="font-semibold">Current Bid:</span> ${Number(selectedAuction.currentBid || 0).toFixed(2)}</p>
+                  <button
+                    onClick={() => handlePlaceBid(selectedAuction.auctionId || selectedAuction.id)}
+                    className="w-full mt-2 rounded-md bg-[#3A7D2C] hover:bg-[#336f27] text-white text-sm font-semibold px-3 py-2"
+                  >
+                    Place Bid
+                  </button>
+                </div>
+              ) : null
+            ) : selectedStock ? (
+              <div className="bg-white/95 rounded-xl border border-[#C7B292] shadow-sm p-4 space-y-2">
+                <h3 className="text-[15px] font-bold text-[#3f2c1b]">Selected Stock</h3>
+                <p className="text-[12px] text-[#5c4733]"><span className="font-semibold">Material:</span> {selectedStock.materialType}</p>
+                <p className="text-[12px] text-[#5c4733]"><span className="font-semibold">Available:</span> {Number(selectedStock.availableMass || selectedStock.amount || 0).toFixed(1)}t</p>
+                <p className="text-[12px] text-[#5c4733]"><span className="font-semibold">Price/Ton:</span> ${Number(selectedStock.pricePerTon || 0).toFixed(2)}</p>
+              </div>
+            ) : null}
+          </div> */}
         </div>
+
+        {/* <SurrenderButton
+          playerId={user?._id ?? ''}
+          surrenderVotes={authoritativeState?.surrenderVotes ?? []}
+          canSurrender={(authoritativeState?.minutesElapsed ?? 0) >= 15}
+          onToggle={() => {
+            if (user?.currentSession) emit('surrender-toggle', { sessionId: user.currentSession });
+          }}
+        /> */}
       </div>
-      <SurrenderButton
-        playerId={user?._id ?? ''}
-        surrenderVotes={authoritativeState?.surrenderVotes ?? []}
-        canSurrender={(authoritativeState?.minutesElapsed ?? 0) >= 15}
-        onToggle={() => {
-          if (user?.currentSession) emit('surrender-toggle', { sessionId: user.currentSession });
-        }}
-      />
+
       <GameChatbot pageContext="broker-inventory" />
     </div>
   );

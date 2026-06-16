@@ -167,7 +167,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <MunicipalityHeader
           playerName={user?.name}
           role={userRole || ''}
-          cityName={(gameState as any).cityName || 'BESSE City'}
+          cityName={(gameState as any).cityName || 'Clash of the Cities - Mission Net Zero'}
           wasteInventory={(gameState as any).wasteInventory || 0}
           maxCapacity={(gameState as any).maxCapacity || 150}
         />

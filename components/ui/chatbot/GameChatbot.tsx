@@ -8,6 +8,7 @@ import { chatbotService } from '@/services/chatbotService';
 import { socketManager } from '@/lib/websocket/socketManager';
 import { ChatbotMessage } from '@/types/chatbot';
 import { useAuthStore } from '@/stores/authStore';
+import { useWebSocket } from '@/hooks/useWebSocket';
 
 type ChatbotPageContext = 'mrf-collection' | 'broker-inventory' | 'municipality';
 
@@ -18,6 +19,7 @@ interface GameChatbotProps {
 type ChatTab = 'bot' | 'team';
 
 interface TeamMessage {
+  id: string;
   senderId: string;
   senderName: string;
   senderRole: string;
@@ -72,6 +74,7 @@ const MarkdownMessage = ({ content }: { content: string }) => (
 
 export default function GameChatbot({ pageContext }: GameChatbotProps) {
   const { user } = useAuthStore();
+  const { isConnected, joinGame } = useWebSocket();
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<ChatTab>('bot');
   const [input, setInput] = useState('');
@@ -85,8 +88,19 @@ export default function GameChatbot({ pageContext }: GameChatbotProps) {
     },
   ]);
   const [teamMessages, setTeamMessages] = useState<TeamMessage[]>([]);
+  const [unreadTeamCount, setUnreadTeamCount] = useState(0);
+  const isOpenRef = useRef(false);
+  const activeTabRef = useRef<ChatTab>('bot');
 
   const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    isOpenRef.current = open;
+  }, [open]);
+
+  useEffect(() => {
+    activeTabRef.current = activeTab;
+  }, [activeTab]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -96,23 +110,70 @@ export default function GameChatbot({ pageContext }: GameChatbotProps) {
   useEffect(() => {
     const handleTeamMessage = (payload: any) => {
       if (!payload?.message) return;
-      setTeamMessages(prev => [
-        ...prev,
-        {
-          senderId: payload.senderId || 'unknown',
-          senderName: payload.senderName || 'Unknown',
-          senderRole: payload.senderRole || 'player',
-          message: payload.message,
-          createdAt: new Date().toISOString(),
-        },
-      ]);
+      const serverMessageId = payload.messageId ?? payload.id;
+      const incomingId = serverMessageId
+        ? String(serverMessageId)
+        : `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      setTeamMessages(prev => {
+        if (serverMessageId && prev.some(m => m.id === String(serverMessageId))) return prev;
+        const isMine = (payload.senderId || 'unknown') === user?._id;
+        if (!isMine && !(isOpenRef.current && activeTabRef.current === 'team')) {
+          setUnreadTeamCount(count => count + 1);
+        }
+        return [
+          ...prev,
+          {
+            id: incomingId,
+            senderId: payload.senderId || 'unknown',
+            senderName: payload.senderName || 'Unknown',
+            senderRole: payload.senderRole || 'player',
+            message: payload.message,
+            createdAt: payload.createdAt || new Date().toISOString(),
+          },
+        ];
+      });
+    };
+
+    const currentSessionId = user?.currentSession;
+    if (currentSessionId && isConnected) {
+      joinGame(currentSessionId);
+    }
+
+    const handleGameEnded = () => {
+      setTeamMessages([]);
+      setUnreadTeamCount(0);
     };
 
     socketManager.on('team-chat-message', handleTeamMessage);
+    socketManager.on('countdown-expired', handleGameEnded);
+
     return () => {
       socketManager.off('team-chat-message', handleTeamMessage);
+      socketManager.off('countdown-expired', handleGameEnded);
     };
-  }, []);
+  }, [user?._id, user?.currentSession, isConnected, joinGame]);
+
+  useEffect(() => {
+    if (open && activeTab === 'team' && unreadTeamCount > 0) {
+      setUnreadTeamCount(0);
+    }
+  }, [open, activeTab, unreadTeamCount]);
+
+  useEffect(() => {
+    setBotMessages([
+      {
+        role: 'assistant',
+        content: WELCOME_BY_PAGE[pageContext],
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+    setTeamMessages([]);
+    setUnreadTeamCount(0);
+    setInput('');
+    setError(null);
+    setActiveTab('bot');
+    setOpen(false);
+  }, [pageContext, user?.currentSession]);
 
   const canSend = useMemo(() => input.trim().length > 0 && !sending, [input, sending]);
 
@@ -183,31 +244,31 @@ export default function GameChatbot({ pageContext }: GameChatbotProps) {
   return (
     <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end gap-3 pointer-events-none">
       <div
-        className={`pointer-events-auto w-[460px] max-w-[calc(100vw-1.5rem)] rounded-2xl border border-emerald-200 bg-white shadow-2xl transition-all duration-300 origin-bottom-right ${
+        className={`pointer-events-auto w-[460px] max-w-[calc(100vw-1.5rem)] rounded-2xl border border-emerald-300 bg-white shadow-2xl transition-all duration-300 origin-bottom-right ${
           open
             ? 'opacity-100 translate-y-0 scale-100'
             : 'opacity-0 translate-y-4 scale-95 invisible'
         }`}
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-emerald-100 bg-emerald-50 rounded-t-2xl">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-emerald-200 bg-white rounded-t-2xl">
           <h3 className="text-sm font-semibold text-emerald-900">Game Assistant</h3>
           <button
             onClick={() => setOpen(false)}
-            className="rounded-md p-1 text-emerald-700 hover:bg-emerald-100"
+            className="rounded-md p-1 text-emerald-800 hover:bg-emerald-100"
             aria-label="Close chatbot"
           >
             <X size={16} />
           </button>
         </div>
 
-        <div className="px-3 pt-2 pb-1 bg-emerald-50 border-b border-emerald-100">
+        <div className="px-3 pt-2 pb-1 bg-white border-b border-emerald-200">
           <div className="inline-flex rounded-xl border border-emerald-200 bg-white p-1">
             <button
               onClick={() => setActiveTab('bot')}
               className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
                 activeTab === 'bot'
-                  ? 'bg-emerald-600 text-white'
-                  : 'text-emerald-700 hover:bg-emerald-100'
+                  ? 'bg-emerald-700 text-white'
+                  : 'text-emerald-800 hover:bg-emerald-100'
               }`}
             >
               Bot
@@ -216,8 +277,8 @@ export default function GameChatbot({ pageContext }: GameChatbotProps) {
               onClick={() => setActiveTab('team')}
               className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
                 activeTab === 'team'
-                  ? 'bg-emerald-600 text-white'
-                  : 'text-emerald-700 hover:bg-emerald-100'
+                  ? 'bg-emerald-700 text-white'
+                  : 'text-emerald-800 hover:bg-emerald-100'
               }`}
             >
               Team
@@ -225,7 +286,7 @@ export default function GameChatbot({ pageContext }: GameChatbotProps) {
           </div>
         </div>
 
-        <div ref={containerRef} className="h-[26rem] overflow-y-auto px-3 py-3 bg-emerald-50/30">
+        <div ref={containerRef} className="h-[26rem] overflow-y-auto px-3 py-3 bg-white">
           <div className="space-y-2">
             {activeTab === 'bot' &&
               botMessages.map((m, idx) => (
@@ -236,7 +297,7 @@ export default function GameChatbot({ pageContext }: GameChatbotProps) {
                   <div
                     className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm leading-relaxed ${
                       m.role === 'user'
-                        ? 'bg-emerald-600 text-white rounded-br-md'
+                        ? 'bg-emerald-700 text-white rounded-br-md'
                         : 'bg-white text-gray-800 border border-emerald-200 rounded-bl-md'
                     }`}
                   >
@@ -249,14 +310,6 @@ export default function GameChatbot({ pageContext }: GameChatbotProps) {
                 </div>
               ))}
 
-            {activeTab === 'team' && teamMessages.length === 0 && (
-              <div className="flex justify-start">
-                <div className="max-w-[80%] rounded-2xl px-3 py-2 text-sm bg-white text-gray-600 border border-emerald-200 rounded-bl-md">
-                  Team messages will appear here.
-                </div>
-              </div>
-            )}
-
             {activeTab === 'team' &&
               teamMessages.map((m, idx) => {
                 const isMine = m.senderId === user?._id;
@@ -268,7 +321,7 @@ export default function GameChatbot({ pageContext }: GameChatbotProps) {
                     <div
                       className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm leading-relaxed ${
                         isMine
-                          ? 'bg-emerald-600 text-white rounded-br-md'
+                          ? 'bg-emerald-700 text-white rounded-br-md'
                           : 'bg-white text-gray-800 border border-emerald-200 rounded-bl-md'
                       }`}
                     >
@@ -305,13 +358,13 @@ export default function GameChatbot({ pageContext }: GameChatbotProps) {
                 }
               }}
               placeholder={activeTab === 'bot' ? 'Ask for game help...' : 'Message your team...'}
-              className="flex-1 rounded-xl border border-emerald-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+              className="flex-1 rounded-xl border border-emerald-300 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-700"
               maxLength={1000}
             />
             <button
               onClick={handleSend}
               disabled={!canSend}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white disabled:opacity-50 hover:bg-emerald-700"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-700 text-white disabled:opacity-50 hover:bg-emerald-800"
               aria-label="Send message"
             >
               <Send size={16} />
@@ -322,10 +375,15 @@ export default function GameChatbot({ pageContext }: GameChatbotProps) {
 
       <button
         onClick={() => setOpen(prev => !prev)}
-        className="pointer-events-auto inline-flex h-14 w-14 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg hover:bg-emerald-700 transition-colors"
+        className="pointer-events-auto relative inline-flex h-14 w-14 items-center justify-center rounded-full bg-emerald-700 text-white shadow-lg hover:bg-emerald-800 transition-colors"
         aria-label="Toggle game chatbot"
       >
         <MessageCircle size={24} />
+        {unreadTeamCount > 0 && (
+          <span className="absolute -top-1 -right-1 min-w-[1.2rem] h-5 px-1 rounded-full bg-red-600 text-white text-[10px] font-bold leading-5 text-center border border-white">
+            {unreadTeamCount > 99 ? '99+' : unreadTeamCount}
+          </span>
+        )}
       </button>
     </div>
   );

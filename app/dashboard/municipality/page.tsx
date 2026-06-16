@@ -20,6 +20,14 @@ import { CityProject, GameState, Material, WasteBatch } from '@/types/besse';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+const MATERIAL_LABELS: Record<string, string> = {
+  paper: 'Paper',
+  plastic: 'Plastic',
+  metal: 'Metal',
+  glass: 'Glass',
+  wood: 'Wood',
+};
+
 export default function MunicipalityPage() {
   const { user } = useAuthStore();
   const { addNotification } = useNotificationStore();
@@ -139,6 +147,22 @@ export default function MunicipalityPage() {
       // );
     }
   }, [user?.currentSession, isConnected, joinGame]);
+
+  // One-time per-session auto reload fallback to stabilize initial realtime setup
+  useEffect(() => {
+    const sessionId = user?.currentSession;
+    if (!sessionId) return;
+
+    const key = `role_page_reload_once_${sessionId}_municipality`;
+    if (sessionStorage.getItem(key) === '1') return;
+
+    sessionStorage.setItem(key, '1');
+    const timer = window.setTimeout(() => {
+      window.location.reload();
+    }, 300);
+
+    return () => window.clearTimeout(timer);
+  }, [user?.currentSession]);
 
   // Subscribe to realtime events
   useEffect(() => {
@@ -577,206 +601,245 @@ export default function MunicipalityPage() {
   const canSurrender = (authoritativeState?.minutesElapsed ?? 0) >= 15;
 
   return (
-    <div className="lg:h-full flex flex-col lg:overflow-hidden">
-      <div className="bg-[#f3e9da] flex-1 flex flex-col lg:min-h-0 lg:overflow-hidden">
-        <div className="container mx-auto sm:p-0 px-4 flex flex-col flex-1 lg:min-h-0 lg:overflow-hidden gap-3">
-          <div className="flex-shrink-0">
-            <ShiftLog
-              logs={logData}
-              shiftStart={shiftStart}
-              shiftStartTime={authoritativeState?.gameStartTime}
-              gameOverCountdown={authoritativeState?.gameOverCountdown}
-              onGameOver={() => router.push('/dashboard/game-over')}
-              cityHealth={authoritativeState?.cityHealth}
-              budget={authoritativeState?.budget}
-              totalCO2={authoritativeState?.totalCO2}
-              wasteInventory={authoritativeState?.wasteInventory}
-              onStatusLog={handleStatusLog}
-            />
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 flex-1 lg:min-h-0 lg:overflow-hidden">
-            {/* Left side */}
-            <div className="xl:col-span-3 lg:col-span-2 col-span-1 flex flex-col lg:min-h-0 lg:overflow-hidden">
-              <div
-                className="bg-cover bg-center mx-auto rounded-[20px] flex flex-col lg:min-h-0 overflow-hidden w-full flex-1"
-                style={{ backgroundImage: `url(${woodenBg.src})` }}
-              >
-                <MunicipalityCustomHeader
-                  backgroundImage={woodenHead.src}
-                  title={authoritativeState?.teamRole || currentGameState?.teamRole}
-                />
-                <GameModeBadge gameMode={gameMode} />
-                {/* Tab Navigation */}
-                <div className="flex justify-center mb-1 flex-shrink-0">
-                  <div className="bg-white rounded-lg p-1 shadow-md">
-                    <button
-                      onClick={() => {
-                        setActiveTab('waste-collection');
-                        setSelectedItem(null);
-                        setSelectedMaterial(null);
-                        setSelectedProject(null);
-                      }}
-                      className={`px-4 py-1 rounded-md text-sm font-semibold transition-colors ${
-                        activeTab === 'waste-collection'
-                          ? 'bg-[#3A7D2C] text-white'
-                          : 'text-gray-600 hover:bg-gray-100'
-                      }`}
-                    >
-                      Waste Collection
-                    </button>
-                    <button
-                      onClick={() => {
-                        setActiveTab('city-projects');
-                        setSelectedItem(null);
-                        setSelectedMaterial(null);
-                        setSelectedProject(null);
-                      }}
-                      className={`px-4 py-1 rounded-md text-sm font-semibold transition-colors ${
-                        activeTab === 'city-projects'
-                          ? 'bg-[#3A7D2C] text-white'
-                          : 'text-gray-600 hover:bg-gray-100'
-                      }`}
-                    >
-                      Inventory
-                    </button>
-                    <button
-                      onClick={() => {
-                        setActiveTab('project-details');
-                        setSelectedItem(null);
-                        setSelectedMaterial(null);
-                        setSelectedProject(null);
-                      }}
-                      className={`px-4 py-1 rounded-md text-sm font-semibold transition-colors ${
-                        activeTab === 'project-details'
-                          ? 'bg-[#3A7D2C] text-white'
-                          : 'text-gray-600 hover:bg-gray-100'
-                      }`}
-                    >
-                      Project Details
-                    </button>
-                  </div>
-                </div>
-                <div className="flex-1 lg:min-h-0 lg:overflow-hidden">
-                  {activeTab === 'waste-collection' ? (
-                    <MunicipalityWasteSelectedBox
-                      key={wasteBatches.map((b) => b.id).join(',')}
-                      wasteBatches={wasteBatches}
-                      selectedBatch={
-                        selectedItem && 'status' in selectedItem
-                          ? (selectedItem as WasteBatch)
-                          : null
-                      }
-                      setSelectedBatch={(batch) => {
-                        setSelectedItem(batch);
-                        setSelectedMaterial(null);
-                        setSelectedProject(null);
-                      }}
-                    />
-                  ) : activeTab === 'city-projects' ? (
-                    <MunicipalityMaterialSelectedBox
-                      key={selectableMaterials.map((m) => m.id).join(',')}
-                      materials={selectableMaterials}
-                      selectedMaterial={
-                        selectedItem && 'type' in selectedItem && !('status' in selectedItem)
-                          ? (selectedItem as Material)
-                          : null
-                      }
-                      setSelectedMaterial={(material) => {
-                        setSelectedItem(material);
-                        setSelectedMaterial((material as any).type);
-                        setSelectedProject(null);
-                      }}
-                    />
-                  ) : (
-                    <div className="h-full px-3 pb-3 overflow-y-auto">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {cityProjects.map((project) => (
-                          <div
-                            key={project.id}
-                            className="bg-white/95 rounded-xl border border-[#C7B292] shadow-sm p-3"
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <h3 className="text-[16px] font-bold text-[#3f2c1b] leading-tight">
-                                {project.name}
-                              </h3>
-                              <span
-                                className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${
-                                  project.completed
-                                    ? 'bg-[#D9F3D6] text-[#2B6B2F]'
-                                    : 'bg-[#F2E7D8] text-[#7A5A34]'
-                                }`}
-                              >
-                                {project.completed ? 'Completed' : 'Available'}
-                              </span>
-                            </div>
-                            <p className="text-[12px] text-[#5c4733] mt-1">
-                              {project.description || 'City sustainability development project.'}
-                            </p>
+    <div className="bg-[#f3e9da] min-h-screen flex flex-col pb-6 lg:pb-8">
+      <div className="container mx-auto sm:p-0 px-4 flex flex-col gap-3">
+        <div className="flex-shrink-0">
+          <ShiftLog
+            logs={logData}
+            shiftStart={shiftStart}
+            shiftStartTime={authoritativeState?.gameStartTime}
+            gameOverCountdown={authoritativeState?.gameOverCountdown}
+            onGameOver={() => router.push('/dashboard/game-over')}
+            cityHealth={authoritativeState?.cityHealth}
+            budget={authoritativeState?.budget}
+            totalCO2={authoritativeState?.totalCO2}
+            wasteInventory={authoritativeState?.wasteInventory}
+            onStatusLog={handleStatusLog}
+          />
+        </div>
 
-                            <div className="mt-2 border-t border-[#E5D7C1] pt-2">
-                              <p className="text-[12px] font-semibold text-[#4a3722] mb-1">
-                                Required Materials
-                              </p>
-                              <div className="flex flex-wrap gap-1.5">
-                                {Object.entries(project.requiredMaterials).map(([material, qty]) => (
-                                  <span
-                                    key={`${project.id}-${material}`}
-                                    className="inline-flex items-center rounded-md bg-[#F7F2EA] px-2 py-1 text-[11px] font-medium text-[#5a442b] border border-[#E6D8C2]"
-                                  >
-                                    {material}: {Number(qty || 0).toFixed(1)}t
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
+          <div className="xl:col-span-3 lg:col-span-2 col-span-1 flex flex-col">
+            <div
+              className="bg-cover bg-center mx-auto rounded-[20px] flex flex-col lg:min-h-0 lg:max-h-[calc(100vh-21rem)] hoverflow-hidden w-full flex-1"
+              style={{ backgroundImage: `url(${woodenBg.src})` }}
+            >
+              <MunicipalityCustomHeader
+                backgroundImage={woodenHead.src}
+                title={authoritativeState?.teamRole || currentGameState?.teamRole}
+              />
+              {/* <GameModeBadge gameMode={gameMode} /> */}
+
+              <div className="flex justify-center mb-1 flex-shrink-0">
+                <div className="bg-white rounded-lg p-1 shadow-md">
+                  <button
+                    onClick={() => {
+                      setActiveTab('waste-collection');
+                      setSelectedItem(null);
+                      setSelectedMaterial(null);
+                      setSelectedProject(null);
+                    }}
+                    className={`px-4 py-1 rounded-md text-sm font-semibold transition-colors ${
+                      activeTab === 'waste-collection'
+                        ? 'bg-[#3A7D2C] text-white'
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    Waste Collection
+                  </button>
+                  <button
+                    onClick={() => {
+                      setActiveTab('city-projects');
+                      setSelectedItem(null);
+                      setSelectedMaterial(null);
+                      setSelectedProject(null);
+                    }}
+                    className={`px-4 py-1 rounded-md text-sm font-semibold transition-colors ${
+                      activeTab === 'city-projects'
+                        ? 'bg-[#3A7D2C] text-white'
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    Inventory
+                  </button>
+                  <button
+                    onClick={() => {
+                      setActiveTab('project-details');
+                      setSelectedItem(null);
+                      setSelectedMaterial(null);
+                      setSelectedProject(null);
+                    }}
+                    className={`px-4 py-1 rounded-md text-sm font-semibold transition-colors ${
+                      activeTab === 'project-details'
+                        ? 'bg-[#3A7D2C] text-white'
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    Project Details
+                  </button>
                 </div>
               </div>
-            </div>
-            {/* Right side */}
-            <div className="xl:col-span-1 lg:col-span-2 col-span-1 lg:overflow-y-auto lg:min-h-0">
-              {activeTab === 'waste-collection' ? (
-                selectedItem && 'status' in selectedItem ? (
-                  <WasteCollectAction
-                    budget={authoritativeState?.budget ?? currentGameState?.budget}
-                    totalCO2={authoritativeState?.totalCO2 ?? (currentGameState?.totalCO2 || 0)}
-                    wasteInventory={
-                      authoritativeState?.wasteInventory ?? currentGameState?.wasteInventory
+
+              <div className="flex-1 min-h-0 overflow-hidden">
+                {activeTab === 'waste-collection' ? (
+                  <MunicipalityWasteSelectedBox
+                    key={wasteBatches.map((b) => b.id).join(',')}
+                    wasteBatches={wasteBatches}
+                    selectedBatch={
+                      selectedItem && 'status' in selectedItem
+                        ? (selectedItem as WasteBatch)
+                        : null
                     }
-                    maxCapacity={authoritativeState?.maxCapacity ?? currentGameState?.maxCapacity}
-                    selectedBatch={selectedItem}
-                    handleCollectWaste={handleCollectWaste}
-                    transportCostPerTon={
-                      (authoritativeState?.constants?.FIXED_DISTANCE_TO_MRF_KM ?? 10) *
-                      (authoritativeState?.constants?.TRANSPORT_COST_PER_TON_KM ?? 2.5)
-                    }
+                    setSelectedBatch={(batch) => {
+                      setSelectedItem(batch);
+                      setSelectedMaterial(null);
+                      setSelectedProject(null);
+                    }}
                   />
-                ) : null
-              ) : selectedMaterial ? (
-                <MaterialConstructAction
-                  selectedMaterial={selectedMaterial}
-                  cityProjects={cityProjects}
-                  selectedProject={selectedProject}
-                  setSelectedProject={setSelectedProject}
-                  municipalInventory={
-                    authoritativeState?.municipalInventory ?? currentGameState?.municipalInventory
-                  }
-                  handleConstructProject={handleConstructProject}
-                />
-              ) : null}
+                ) : activeTab === 'city-projects' ? (
+                  <MunicipalityMaterialSelectedBox
+                    key={selectableMaterials.map((m) => m.id).join(',')}
+                    materials={selectableMaterials}
+                    selectedMaterial={
+                      selectedItem && 'type' in selectedItem && !('status' in selectedItem)
+                        ? (selectedItem as Material)
+                        : null
+                    }
+                    setSelectedMaterial={(material) => {
+                      setSelectedItem(material);
+                      setSelectedMaterial((material as any).type);
+                      setSelectedProject(null);
+                    }}
+                  />
+                ) : (
+                  <div className="h-full px-3 pb-3 overflow-y-auto">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {cityProjects.map((project) => (
+                        <div
+                          key={project.id}
+                          className="bg-white/95 rounded-xl border border-[#C7B292] shadow-sm p-3"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <h3 className="text-[16px] font-bold text-[#3f2c1b] leading-tight">
+                              {project.name}
+                            </h3>
+                            <span
+                              className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${
+                                project.completed
+                                  ? 'bg-[#D9F3D6] text-[#2B6B2F]'
+                                  : 'bg-[#F2E7D8] text-[#7A5A34]'
+                              }`}
+                            >
+                              {project.completed ? 'Completed' : 'Available'}
+                            </span>
+                          </div>
+                          <p className="text-[12px] text-[#5c4733] mt-1">
+                            {project.description || 'City sustainability development project.'}
+                          </p>
+
+                          <div className="mt-2 border-t border-[#E5D7C1] pt-2">
+                            <p className="text-[12px] font-semibold text-[#4a3722] mb-1">
+                              Remaining Required Materials
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {(() => {
+                                const requiredMaterials =
+                                  (project as any).requiredMaterials ||
+                                  (project as any).materialRequirements ||
+                                  {};
+
+                                const addedMaterials = (project as any).addedMaterials || {};
+
+                                const entries = Object.entries(requiredMaterials)
+                                  .map(([material, qty]) => {
+                                    const required = Number(qty || 0);
+                                    const added = Number((addedMaterials as Record<string, number>)[material] || 0);
+                                    const remaining = Math.max(0, required - added);
+                                    return [material, remaining] as const;
+                                  })
+                                  .filter(([, remaining]) => remaining > 0);
+
+                                if (!entries.length) {
+                                  return (
+                                    <span className="text-[11px] text-[#7A5A34] italic">
+                                      All required materials fulfilled.
+                                    </span>
+                                  );
+                                }
+
+                                return entries.map(([material, qty]) => (
+                                  <span
+                                    key={`${project.id}-required-${material}`}
+                                    className="inline-flex items-center rounded-md bg-[#F7F2EA] px-2 py-1 text-[11px] font-medium text-[#5a442b] border border-[#E6D8C2]"
+                                  >
+                                    {MATERIAL_LABELS[material] || material}: {Number(qty || 0).toFixed(1)} tonnes
+                                  </span>
+                                ));
+                              })()}
+                            </div>
+
+                            <p className="text-[12px] font-semibold text-[#4a3722] mb-1 mt-2">
+                              Rewards
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                              <span className="inline-flex items-center rounded-md bg-[#EEF7EE] px-2 py-1 text-[11px] font-medium text-[#2B6B2F] border border-[#CDE8CE]">
+                                Health Bonus: +{Number(project.healthBonus || 0).toFixed(1)}%
+                              </span>
+                              <span className="inline-flex items-center rounded-md bg-[#EEF3FB] px-2 py-1 text-[11px] font-medium text-[#234A8B] border border-[#D6E2F7]">
+                                Budget Bonus: +${Number(project.budgetBonus || 0).toFixed(0)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
+
+          <div className="xl:col-span-1 lg:col-span-2 col-span-1 lg:max-h-[calc(100vh-21rem)] lg:overflow-y-auto lg:pr-1">
+            {activeTab === 'waste-collection' ? (
+              selectedItem && 'status' in selectedItem ? (
+                <WasteCollectAction
+                  budget={authoritativeState?.budget ?? currentGameState?.budget}
+                  totalCO2={authoritativeState?.totalCO2 ?? (currentGameState?.totalCO2 || 0)}
+                  wasteInventory={
+                    authoritativeState?.wasteInventory ?? currentGameState?.wasteInventory
+                  }
+                  maxCapacity={authoritativeState?.maxCapacity ?? currentGameState?.maxCapacity}
+                  selectedBatch={selectedItem}
+                  handleCollectWaste={handleCollectWaste}
+                  transportCostPerTon={
+                    (authoritativeState?.constants?.FIXED_DISTANCE_TO_MRF_KM ?? 10) *
+                    (authoritativeState?.constants?.TRANSPORT_COST_PER_TON_KM ?? 2.5)
+                  }
+                />
+              ) : null
+            ) : selectedMaterial ? (
+              <MaterialConstructAction
+                selectedMaterial={selectedMaterial}
+                cityProjects={cityProjects}
+                selectedProject={selectedProject}
+                setSelectedProject={setSelectedProject}
+                municipalInventory={
+                  authoritativeState?.municipalInventory ?? currentGameState?.municipalInventory
+                }
+                handleConstructProject={handleConstructProject}
+              />
+            ) : null}
+          </div>
         </div>
+
+        {/* <SurrenderButton
+          playerId={user?._id ?? ''}
+          surrenderVotes={surrenderVotes}
+          canSurrender={canSurrender}
+          onToggle={handleSurrenderToggle}
+        /> */}
       </div>
-      <SurrenderButton
-        playerId={user?._id ?? ''}
-        surrenderVotes={surrenderVotes}
-        canSurrender={canSurrender}
-        onToggle={handleSurrenderToggle}
-      />
+
       <GameChatbot pageContext="municipality" />
     </div>
   );

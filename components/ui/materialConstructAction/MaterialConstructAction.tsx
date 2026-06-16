@@ -71,18 +71,17 @@ export const MaterialConstructAction: React.FC<MaterialConstructActionProps> = (
 
   return (
     <div className="bg-white border-4 border-dashed border-[#b18c5a] rounded-md p-2">
-      <h3 className="text-center 2xl:text-[35px] xl:text-[28px] lg:text-[35px] text-[35px] font-bold text-black mb-1">
-        Construct Project
+      <h3 className="text-center 2xl:text-[30px] xl:text-[24px] lg:text-[30px] text-[30px] font-bold text-black mb-1">
+        Project Construction
       </h3>
       <div className="h-0.5 mx-4 bg-[#A99065] mb-3"></div>
 
-      <div className="mb-4">
+      {/* <div className="mb-4">
         <p className="text-lg font-semibold">Selected Material: {selectedMaterial}</p>
         <p className="text-sm text-gray-600">Available: {availableAmount.toFixed(2)} tons</p>
-      </div>
+      </div> */}
 
       <div className="mb-4">
-        <label className="block text-sm font-medium mb-2">Select Project:</label>
         <select
           value={selectedProject?.id || ''}
           onChange={(e) => {
