@@ -26,7 +26,7 @@ export default function RolePage() {
   const [leader, setLeader] = useState<string>('');
   const [userInfo, setUserInfo] = useState<any>(null);
 
-  const { user, updateUser } = useAuthStore();
+  const { user, updateUser, logout } = useAuthStore();
   const { subscribe, isConnected, joinGame, leaveGame } = useWebSocket();
   const router = useRouter();
   const isFetchingLobbyRef = useRef(false);
@@ -133,6 +133,12 @@ export default function RolePage() {
     }
 
     try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        router.replace('/auth/login');
+        return;
+      }
+
       const profileResponse = await authService.getProfile();
       if (!profileResponse.success || !profileResponse.data) {
         throw new Error('Failed to get profile');
@@ -174,6 +180,13 @@ export default function RolePage() {
       }
     } catch (err: any) {
       console.error('Failed to fetch lobby state:', err);
+      
+      if (err.response?.status === 401) {
+        logout();
+        router.replace('/auth/login');
+        return;
+      }
+      
       setError(err.response?.data?.message || 'Failed to load lobby state');
     } finally {
       if (showLoader) {
@@ -181,7 +194,7 @@ export default function RolePage() {
       }
       isFetchingLobbyRef.current = false;
     }
-  }, [applyLobbyState, clearLobbyClientState, router, updateUser]);
+  }, [applyLobbyState, clearLobbyClientState, router, updateUser, logout]);
 
   const scheduleLobbyRefresh = useCallback(() => {
     if (refreshTimerRef.current) {
@@ -209,9 +222,7 @@ export default function RolePage() {
   const extractPlayers = (data: any): Array<{ userId: string; selectedRole: string }> => {
     const players: Array<{ userId: string; selectedRole: string }> = [];
 
-    // First try to get playerRoles mapping
     if (data?.playerRoles && typeof data.playerRoles === 'object') {
-      // Convert the role-to-userId mapping to player objects
       Object.entries(data.playerRoles).forEach(([role, userId]) => {
         players.push({
           userId: userId as string,
@@ -220,10 +231,8 @@ export default function RolePage() {
       });
     }
 
-    // Also check for gameState.players (same structure)
     if (data?.gameState?.players && typeof data.gameState.players === 'object') {
       Object.entries(data.gameState.players).forEach(([role, userId]) => {
-        // Only add if not already added from playerRoles
         if (!players.find((p) => p.userId === userId)) {
           players.push({
             userId: userId as string,
@@ -313,40 +322,63 @@ export default function RolePage() {
       scheduleLobbyRefresh();
     });
 
-    const unSubcribeGameStarted = subscribe('game-started', (data: any) => {
-      // console.log('Game started event received in role page:', data);
+    // ✅ NEW: Listen for continue-to-pairing event from backend
+    const unsubscribeContinueToPairing = subscribe('continue-to-pairing', (data: any) => {
+      console.log('📢 Received continue-to-pairing event:', data);
+      
+      // Check if this event is for the current session
       if (data?.sessionId === userInfo?.currentSession) {
-        const players = extractPlayers(data);
-        const currentPlayer = players.find((player: any) => player.userId === userInfo._id);
+        console.log('✅ Navigate to pairing page');
+        // Navigate to pairing page
+        router.push('/dashboard/pairing');
+      }
+    });
 
+    const unSubcribeGameStarted = subscribe('game-started', (data: any) => {
+      console.log('🎮 Game started event received in role page:', data);
+      
+      if (data?.sessionId === userInfo?.currentSession) {
+        let players = extractPlayers(data);
+        
+        if (players.length === 0 && data?.gameState?.players) {
+          Object.entries(data.gameState.players).forEach(([role, userId]) => {
+            players.push({ userId: userId as string, selectedRole: role });
+          });
+        }
+        
+        const currentPlayer = players.find((player: any) => player.userId === userInfo._id);
+        
         if (currentPlayer) {
-          if (currentPlayer.selectedRole === 'broker') {
-            router.push('/dashboard/broker-inventory');
-          } else if (currentPlayer.selectedRole === 'mrf') {
-            router.push('/dashboard/mrf-collection');
-          } else if (currentPlayer.selectedRole === 'municipality') {
-            router.push('/dashboard/municipality');
+          const role = currentPlayer.selectedRole;
+          
+          if (role === 'broker') {
+            window.location.href = '/dashboard/broker-inventory';
+          } else if (role === 'mrf') {
+            window.location.href = '/dashboard/mrf-collection';
+          } else if (role === 'municipality') {
+            window.location.href = '/dashboard/municipality';
+          } else {
+            window.location.href = '/dashboard/pairing';
           }
+        } else {
+          window.location.href = '/dashboard/pairing';
         }
       }
     });
 
     const unsubLobbyActivated = subscribe('lobby-activated', (data: any) => {
-      // console.log('Lobby activated event received: in role page', data);
+      console.log('Lobby activated event received in role page', data);
       scheduleLobbyRefresh();
 
       if (data?.lobby?.status === 'active') {
-        // For lobby-activated event, the structure might be different
         let players: Array<{ userId: string; selectedRole: string }> = [];
 
         if (Array.isArray(data?.lobby?.players)) {
-          // If players is an array with full player objects
           players = data.lobby.players.map((player: any) => ({
             userId: player.userId || player._id,
             selectedRole: player.selectedRole,
           }));
         } else if (data?.lobby?.players && typeof data.lobby.players === 'object') {
-          // If it's a role-to-userId mapping
           Object.entries(data.lobby.players).forEach(([role, userId]) => {
             players.push({
               userId: userId as string,
@@ -358,12 +390,13 @@ export default function RolePage() {
         const currentPlayer = players.find((player: any) => player.userId === userInfo._id);
 
         if (currentPlayer) {
-          if (currentPlayer.selectedRole === 'broker') {
-            router.push('/dashboard/broker-inventory');
-          } else if (currentPlayer.selectedRole === 'mrf') {
-            router.push('/dashboard/mrf-collection');
-          } else if (currentPlayer.selectedRole === 'municipality') {
-            router.push('/dashboard/municipality');
+          const role = currentPlayer.selectedRole;
+          if (role === 'broker') {
+            window.location.href = '/dashboard/broker-inventory';
+          } else if (role === 'mrf') {
+            window.location.href = '/dashboard/mrf-collection';
+          } else if (role === 'municipality') {
+            window.location.href = '/dashboard/municipality';
           }
         }
       }
@@ -378,6 +411,7 @@ export default function RolePage() {
       unsubscribePlayerJoined && unsubscribePlayerJoined();
       unsubscribePlayerLeft && unsubscribePlayerLeft();
       unsubscribePlayerLeftOptimistic && unsubscribePlayerLeftOptimistic();
+      unsubscribeContinueToPairing && unsubscribeContinueToPairing();
       unsubLobbyActivated && unsubLobbyActivated();
       unSubcribeGameStarted && unSubcribeGameStarted();
     };
@@ -386,7 +420,7 @@ export default function RolePage() {
   // Ensure we're connected to the game room to receive game-started events
   useEffect(() => {
     if (userInfo?.currentSession && isConnected) {
-      // console.log('Role page: Joining game room with sessionId:', userInfo.currentSession);
+      console.log('Role page: Joining game room with sessionId:', userInfo.currentSession);
       joinGame(userInfo.currentSession);
     }
   }, [userInfo?.currentSession, isConnected, joinGame]);
@@ -411,21 +445,18 @@ export default function RolePage() {
     setError('');
 
     try {
-      // Check if this role is already selected by the current user
       const currentPlayer = lobbyState?.players.find(
         (player: any) => player.userId === userInfo?._id
       );
       const isAlreadySelected = currentPlayer?.selectedRole === selectedRoleData.role;
 
       if (isAlreadySelected) {
-        // Deselect the role
         await lobbyService.deSelectRole({
           sessionId: userInfo.currentSession,
           role: selectedRoleData.role,
         });
         setSelectedRole(null);
       } else {
-        // Select the role
         await lobbyService.selectRole({
           sessionId: userInfo.currentSession,
           role: selectedRoleData.role,
@@ -433,7 +464,6 @@ export default function RolePage() {
         setSelectedRole(sRole);
       }
 
-      // Refresh lobby state after role change
       await fetchLobbyState(false);
     } catch (err: any) {
       console.error('Role selection error:', err);
@@ -463,15 +493,17 @@ export default function RolePage() {
     setError('');
 
     try {
+      // Call the continueToPairing API
       await lobbyService.continueToPairing({
         sessionId: userInfo.currentSession,
       });
-
-      localStorage.setItem('pairing_session_id', userInfo.currentSession);
-      router.push(`/dashboard/pairing?sessionId=${userInfo.currentSession}`);
+      
+      // The WebSocket will handle redirecting all players
+      // But for the leader, we can also redirect directly as a fallback
+      router.push('/dashboard/pairing');
     } catch (err: any) {
       console.error('Continue to pairing error:', err);
-      setError(err.response?.data?.message || 'Failed to continue to pairing. Please try again.');
+      setError(err.response?.data?.message || 'Failed to continue. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -492,9 +524,17 @@ export default function RolePage() {
         currentSession: null,
       });
 
-      const profileResponse = await authService.getProfile();
-      if (profileResponse.success && profileResponse.data?.user) {
-        updateUser(profileResponse.data.user);
+      try {
+        const profileResponse = await authService.getProfile();
+        if (profileResponse.success && profileResponse.data?.user) {
+          updateUser(profileResponse.data.user);
+        }
+      } catch (profileErr: any) {
+        if (profileErr.response?.status === 401) {
+          // Already logged out, just redirect
+        } else {
+          console.warn('Failed to fetch profile after leaving lobby:', profileErr);
+        }
       }
 
       router.push('/dashboard/besse-group');
@@ -506,7 +546,6 @@ export default function RolePage() {
     }
   }, [clearLobbyClientState, isLeaving, router, updateUser, user, userInfo]);
 
-  // Allow leader to continue when all roles are selected (lobby is ready)
   const canContinue = Boolean(
     selectedRole && lobbyState?.status === 'ready' && userInfo?._id === leader
   );
@@ -536,12 +575,10 @@ export default function RolePage() {
                 }`}
                 style={{ boxShadow: '0 5px 8px rgba(0, 0, 0, 0.4)' }}
               >
-                {/* Decorative top element */}
                 <div className="absolute top-[-45px] w-10 h-[90px] bg-[#A77F46B2] z-10"></div>
 
-                {/* Main Content */}
                 <div
-                  className={`flex flex-col items-center w-full  ${
+                  className={`flex flex-col items-center w-full ${
                     openDetailId === role.id
                       ? 'opacity-0 max-h-0 overflow-hidden'
                       : 'opacity-100 max-h-[500px]'
@@ -551,8 +588,8 @@ export default function RolePage() {
                     handleRoleSelection(role.id);
                   }}
                 >
-                  <div className="mt-14 flex justify-center w-full max-w-full sm:max-w-md md:max-w-lg lg:max-w-xl mx-auto  xl:px-0  px-4">
-                    <Image src={factory} alt="factory" className=" h-auto object-cover" priority />
+                  <div className="mt-14 flex justify-center w-full max-w-full sm:max-w-md md:max-w-lg lg:max-w-xl mx-auto xl:px-0 px-4">
+                    <Image src={factory} alt="factory" className="h-auto object-cover" priority />
                   </div>
 
                   <h2
@@ -576,7 +613,7 @@ export default function RolePage() {
                       e.stopPropagation();
                       toggleDetail(role.id);
                     }}
-                    className={`px-6 py-2 text-[18px] sm:text-[20px] font-roboto mt-5 mb-6  ${
+                    className={`px-6 py-2 text-[18px] sm:text-[20px] font-roboto mt-5 mb-6 ${
                       selectedRole === role.id
                         ? 'bg-white text-[#563212] hover:bg-gray-100'
                         : 'bg-[#5C9850] text-white hover:bg-[#4a7a3f]'
@@ -586,9 +623,8 @@ export default function RolePage() {
                   </button>
                 </div>
 
-                {/* Detail Content */}
                 <div
-                  className={`w-full h-full  ${
+                  className={`w-full h-full ${
                     openDetailId === role.id
                       ? 'opacity-100 visible'
                       : 'opacity-0 invisible absolute'

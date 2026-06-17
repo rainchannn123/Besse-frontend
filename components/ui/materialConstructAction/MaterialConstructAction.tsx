@@ -5,6 +5,15 @@ import { CityProject, MaterialType } from '@/types/besse';
 import Image from 'next/image';
 import React, { useMemo, useState } from 'react';
 
+// CO₂ emission factors per ton (same as backend)
+const CO2_EMISSION_FACTORS: Record<MaterialType, number> = {
+  paper: 0.8,
+  plastic: 2.5,
+  metal: 1.5,
+  glass: 0.6,
+  wood: 0.3,
+};
+
 interface MaterialConstructActionProps {
   selectedMaterial: string;
   cityProjects: CityProject[];
@@ -37,19 +46,15 @@ export const MaterialConstructAction: React.FC<MaterialConstructActionProps> = (
 
   const availableAmount = municipalInventory[selectedMaterial as MaterialType] || 0;
 
-  // Determine which projects can be selected
   const selectableProjects = useMemo(() => {
-    // Show all incomplete projects; backend now allows free project selection.
     return cityProjects.filter((p) => !p.completed);
   }, [cityProjects]);
 
-  // Get the required amount for the selected material in the selected project
   const requiredMaterialAmount = useMemo(() => {
     if (!selectedProject) return 0;
     return selectedProject.requiredMaterials[selectedMaterial as MaterialType] || 0;
   }, [selectedProject, selectedMaterial]);
 
-  // Check if selected material matches the project's required materials
   const isValidMaterialType = useMemo(() => {
     if (!selectedProject) return false;
     return (
@@ -58,16 +63,19 @@ export const MaterialConstructAction: React.FC<MaterialConstructActionProps> = (
     );
   }, [selectedProject, selectedMaterial]);
 
-  // Maximum amount that can be contributed (no limit, can use entire inventory)
   const maxContributionAmount = availableAmount;
-
-  // Check if project can still accept more of this material
   const remainingRequired = useMemo(() => {
     if (!selectedProject) return 0;
     const required = selectedProject.requiredMaterials[selectedMaterial as MaterialType] || 0;
     const added = (selectedProject.addedMaterials as any)?.[selectedMaterial] || 0;
     return Math.max(0, required - added);
   }, [selectedProject, selectedMaterial]);
+
+  // Calculate CO₂ emission for the selected amount
+  const co2Emission = useMemo(() => {
+    const factor = CO2_EMISSION_FACTORS[selectedMaterial as MaterialType] || 0;
+    return materialAmount * factor;
+  }, [materialAmount, selectedMaterial]);
 
   return (
     <div className="bg-white border-4 border-dashed border-[#b18c5a] rounded-md p-2">
@@ -79,6 +87,14 @@ export const MaterialConstructAction: React.FC<MaterialConstructActionProps> = (
       <div className="mb-4">
         <p className="text-lg font-semibold">Selected Material: {selectedMaterial}</p>
         <p className="text-sm text-gray-600">Available: {availableAmount.toFixed(2)} tons</p>
+        <p className="text-sm text-gray-600">
+          CO₂ factor: {CO2_EMISSION_FACTORS[selectedMaterial as MaterialType] || 0} tons CO₂ per ton
+        </p>
+        {materialAmount > 0 && (
+          <p className="text-sm font-semibold text-orange-600">
+            CO₂ to be emitted: {co2Emission.toFixed(2)} tons
+          </p>
+        )}
       </div>
 
       <div className="mb-4">
@@ -107,22 +123,13 @@ export const MaterialConstructAction: React.FC<MaterialConstructActionProps> = (
           <div className="mb-4 bg-gray-50 p-3 rounded-md">
             <h4 className="font-semibold text-sm mb-2">Project Details:</h4>
             <div className="space-y-1 text-sm">
-              <p>
-                <span className="font-medium">Name:</span> {selectedProject.name}
-              </p>
-              <p>
-                <span className="font-medium">Progress:</span> {selectedProject.progress}%
-              </p>
-              <p>
-                <span className="font-medium">Health Bonus:</span> +{selectedProject.healthBonus}%
-              </p>
-              <p>
-                <span className="font-medium">Budget Bonus:</span> +${(selectedProject.budgetBonus ?? 0).toFixed(0)}
-              </p>
+              <p><span className="font-medium">Name:</span> {selectedProject.name}</p>
+              <p><span className="font-medium">Progress:</span> {selectedProject.progress}%</p>
+              <p><span className="font-medium">Health Bonus:</span> +{selectedProject.healthBonus}%</p>
+              <p><span className="font-medium">Budget Bonus:</span> +${(selectedProject.budgetBonus ?? 0).toFixed(0)}</p>
             </div>
           </div>
 
-          {/* Required Materials Section */}
           <div className="mb-4 bg-blue-50 p-3 rounded-md border-l-4 border-blue-400">
             <h4 className="font-semibold text-sm mb-2">Required Materials:</h4>
             <div className="space-y-2 text-sm">
@@ -166,7 +173,6 @@ export const MaterialConstructAction: React.FC<MaterialConstructActionProps> = (
             </div>
           </div>
 
-          {/* Material Type Validation Warning */}
           {!isValidMaterialType && (
             <div className="mb-4 p-3 bg-red-50 border-l-4 border-red-400 rounded">
               <p className="text-sm text-red-700 font-medium">
@@ -178,15 +184,12 @@ export const MaterialConstructAction: React.FC<MaterialConstructActionProps> = (
             </div>
           )}
 
-          {/* Material Input Section */}
           {isValidMaterialType && (
             <div className="mb-4">
               <label className="block text-sm font-medium mb-2">
-                Material Amount (tons) - Available: {availableAmount.toFixed(2)}t, Needed:{' '}
-                {remainingRequired.toFixed(2)}t
+                Material Amount (tons) - Available: {availableAmount.toFixed(2)}t, Needed: {remainingRequired.toFixed(2)}t
               </label>
 
-              {/* Contribute Full Amount Checkbox */}
               <div className="mb-3 flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -215,15 +218,12 @@ export const MaterialConstructAction: React.FC<MaterialConstructActionProps> = (
                 value={materialAmount > 0 ? materialAmount.toString() : ''}
                 onChange={(e) => {
                   const inputValue = e.target.value;
-                  // Allow free typing, just parse and validate on the fly
                   const value = inputValue === '' ? 0 : parseFloat(inputValue);
 
                   if (!isNaN(value)) {
                     const maxAllowed = Math.min(availableAmount, remainingRequired);
-                    // Clamp the value to max allowed
                     const clamped = Math.min(Math.max(0, value), maxAllowed);
                     setMaterialAmount(clamped);
-                    // Uncheck the full contribution checkbox if user manually edits
                     if (value !== maxAllowed) {
                       setContributeFull(false);
                     }
@@ -233,9 +233,13 @@ export const MaterialConstructAction: React.FC<MaterialConstructActionProps> = (
                 className="w-full p-2 border border-gray-300 rounded-md"
               />
               <p className="text-xs text-gray-600 mt-1">
-                Enter the amount to contribute (max:{' '}
-                {Math.min(availableAmount, remainingRequired).toFixed(2)}t)
+                Enter the amount to contribute (max: {Math.min(availableAmount, remainingRequired).toFixed(2)}t)
               </p>
+              {materialAmount > 0 && (
+                <p className="text-xs text-orange-600 mt-1">
+                  ⚠ CO₂ to be emitted: {co2Emission.toFixed(2)} tons
+                </p>
+              )}
             </div>
           )}
 

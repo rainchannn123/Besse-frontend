@@ -2,6 +2,7 @@
 import { Eye, EyeOff } from 'lucide-react';
 import React, { useState } from 'react';
 import { Control, useController } from 'react-hook-form';
+
 interface CustomInputProps {
   name: string;
   control: Control<any>;
@@ -38,8 +39,10 @@ const CustomInput: React.FC<CustomInputProps> = ({
     if (onChange) onChange(e.target.value);
   };
 
-  // Determine input type based on password visibility
   const inputType = type === 'password' && showPassword ? 'text' : type;
+
+  // FIX: Ensure value is always defined (never undefined)
+  const inputValue = field.value === undefined || field.value === null ? '' : field.value;
 
   return (
     <div className={`flex flex-col w-full mb-4 relative ${className || ''}`}>
@@ -50,10 +53,11 @@ const CustomInput: React.FC<CustomInputProps> = ({
       <div className="relative">
         <input
           {...field}
+          value={inputValue}
           type={inputType}
           placeholder={placeholder}
           onChange={handleChange}
-          className={`px-4 focus:outline-none focus:ring-0 lg:w-[682px] md:w-[550px]  sm:w-[500px]  w-full flex items-center h-[60px] border borderColor bg-white rounded-none shadow-sm transition duration-150 ease-in-out text-base placeholder:text-[#000000] placeholder:text-[26px] ${
+          className={`px-4 focus:outline-none focus:ring-0 lg:w-[682px] md:w-[550px] sm:w-[500px] w-full flex items-center h-[60px] border borderColor bg-white rounded-none shadow-sm transition duration-150 ease-in-out text-base placeholder:text-[#000000] placeholder:text-[26px] ${
             error ? 'border-red-500 focus:ring-red-300' : 'border-gray-300 focus:ring-blue-300'
           }`}
         />
