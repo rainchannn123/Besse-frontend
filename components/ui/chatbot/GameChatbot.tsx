@@ -253,10 +253,10 @@ export default function GameChatbot({ pageContext }: GameChatbotProps) {
         <div className="flex items-center gap-3 px-4 py-3 border-b border-[#50704C] bg-[#50704C] rounded-t-2xl" >
           <h3 className="text-sm font-semibold text-white whitespace-nowrap">Game Assistant</h3>
 
-          <div className="flex-1 flex items-center justify-center">
+          <div className="flex-1 flex items-center justify-center border-2 border-white rounded-lg">
             <button
               onClick={() => setActiveTab('bot')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer border-2 border-[#466342] ${
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
                 activeTab === 'bot'
                   ? 'bg-white text-[#50704C]'
                   : 'text-white/90 hover:bg-white/20'
@@ -266,7 +266,7 @@ export default function GameChatbot({ pageContext }: GameChatbotProps) {
             </button>
             <button
               onClick={() => setActiveTab('team')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer border-2 border-[#466342] ${
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
                 activeTab === 'team'
                   ? 'bg-white text-[#50704C]'
                   : 'text-white/90 hover:bg-white/20'
