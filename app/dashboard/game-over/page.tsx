@@ -179,7 +179,7 @@ export default function page() {
   const getGameStatus = () => {
     if (gameState?.gameStatus === 'complete') {
       return {
-        title: 'Game Complete!',
+        title: 'Congratulations! You Survive!',
 
         isWin: true,
       };
