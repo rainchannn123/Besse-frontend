@@ -31,7 +31,7 @@ const righteous = Righteous({
 });
 
 export const metadata: Metadata = {
-  title: 'Besse',
+  title: 'Clash of the Cities - Mission Net Zero',
   description:
     'exciting game for sustainable waste management and recycling operations.',
 };

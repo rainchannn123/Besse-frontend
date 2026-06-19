@@ -134,15 +134,15 @@ export const MunicipalityHeader: React.FC<MunicipalityHeaderProps> = ({
                 </div>
               </div>
             </div>
-            <div className="w-[40px] h-[40px] bg-[#F1BD45] flex items-center justify-center rounded-full">
+            {/* <div className="w-[40px] h-[40px] bg-[#F1BD45] flex items-center justify-center rounded-full">
               <Image src={closeBox} alt="notification" className="w-5 h-5" />
-            </div>
-            <div
+            </div> */}
+            {/* <div
               className="w-[40px] h-[40px] bg-[#F1BD45] flex items-center justify-center rounded-full cursor-pointer hover:bg-[#e0ab35] transition-colors"
               onClick={handleLogout}
             >
               <LogOut className="w-5 h-5" />
-            </div>
+            </div> */}
           </div>
         </div>
       </div>

@@ -29,7 +29,7 @@ export const MRFCollect: React.FC<MRFCollectProps> = ({
 
         <div className="flex justify-center gap-4 mt-6">
           <Image src={paper} alt="paper" />
-          <h4 className="2xl:text-[35px] xl:text-[28px] lg:text-[35px] text-[35px] font-bold text-black mb-1 font-roboto">
+          <h4 className="2xl:text-[32px] xl:text-[25px] lg:text-[32px] text-[32px] font-bold text-black mb-1 font-roboto">
             Waste Batch
           </h4>
         </div>
