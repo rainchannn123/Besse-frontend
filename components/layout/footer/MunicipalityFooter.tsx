@@ -13,6 +13,11 @@ interface MunicipalityFooterProps {
   wasteInventory?: number;
   maxCapacity?: number;
   totalCO2?: number;
+  teamScore?: number;
+  maxTeamScore?: number;
+  healthLabel?: string;
+  wasteLabel?: string;
+  scoreLabel?: string;
 }
 
 export const MunicipalityFooter: React.FC<MunicipalityFooterProps> = ({
@@ -21,11 +26,16 @@ export const MunicipalityFooter: React.FC<MunicipalityFooterProps> = ({
   wasteInventory = 0,
   maxCapacity = 150,
   totalCO2 = 0,
+  teamScore = 0,
+  maxTeamScore = 0,
+  healthLabel = 'City Health',
+  wasteLabel = 'Waste',
+  scoreLabel = 'Score',
 }) => {
   return (
     <div className="bg-[#50704C] py-4 flex items-center flex-shrink-0">
       <div className="container mx-auto">
-        <div className="grid lg:grid-cols-4 md:grid-cols-2 grid-cols-1 gap-2.5">
+        <div className="grid lg:grid-cols-6 md:grid-cols-2 grid-cols-1 gap-3.5">
           <div className="bg-white flex gap-2 rounded-[10px] px-2 py-1 items-center">
             <div className="flex items-center flex-shrink-0">
               <Image src={dollar} alt="dollar" className="w-6 h-6" />
@@ -43,7 +53,7 @@ export const MunicipalityFooter: React.FC<MunicipalityFooterProps> = ({
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-regular text-[15px] font-roboto text-[#000000]">
-                City Health {Math.round(cityHealth)}%
+                {healthLabel} {Math.round(cityHealth)}%
               </p>
               <div className="w-full bg-[#D9D9D9] rounded-full h-2.5">
                 <div
@@ -59,7 +69,7 @@ export const MunicipalityFooter: React.FC<MunicipalityFooterProps> = ({
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-regular text-[15px] font-roboto text-[#000000]">
-                Waste {Number(wasteInventory).toFixed(1)} (tons)
+                {wasteLabel} {Number(wasteInventory).toFixed(1)} (tons)
               </p>
               <div className="w-full bg-[#D9D9D9] rounded-full h-2.5">
                 <div
@@ -69,7 +79,7 @@ export const MunicipalityFooter: React.FC<MunicipalityFooterProps> = ({
               </div>
             </div>
           </div>
-          <div className="bg-white flex gap-2 rounded-[10px] px-2 py-1 items-center">
+          <div className="bg-white flex gap-2 rounded-[10px] px-2 py-1 items-center lg:col-span-2">
             <div className="flex-shrink-0">
               <Image src={co2} alt="co2" className="w-6 h-6" />
             </div>
@@ -81,6 +91,22 @@ export const MunicipalityFooter: React.FC<MunicipalityFooterProps> = ({
                 <div
                   className="bg-[#EB5353] h-2.5 rounded-full"
                   style={{ width: `${Math.min((totalCO2 / 200) * 100, 100)}%` }}
+                ></div>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white flex gap-2 rounded-[10px] px-2 py-1 items-center">
+            <div className="flex-shrink-0 text-[20px] leading-none">🏆</div>
+            <div className="flex-1 min-w-0">
+              <p className="text-regular text-[15px] font-roboto text-[#000000]">
+                {scoreLabel} {Math.round(teamScore)} / {Math.max(0, Math.round(maxTeamScore))}
+              </p>
+              <div className="w-full bg-[#D9D9D9] rounded-full h-2.5">
+                <div
+                  className="bg-[#3B82F6] h-2.5 rounded-full"
+                  style={{
+                    width: `${Math.min(maxTeamScore > 0 ? (teamScore / maxTeamScore) * 100 : 0, 100)}%`,
+                  }}
                 ></div>
               </div>
             </div>

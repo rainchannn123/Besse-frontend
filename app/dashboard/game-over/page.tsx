@@ -1,7 +1,7 @@
 'use client';
 
 import { useGameWebSocket } from '@/hooks/useWebSocket';
-import blueNote from '@/public/assets/images/blueNote.png';
+import trophy from '@/public/assets/images/trophy.png';
 import cross from '@/public/assets/images/cross.png';
 import dollar from '@/public/assets/images/dollar.png';
 import health from '@/public/assets/images/health.png';
@@ -292,9 +292,51 @@ export default function page() {
                             {gameState?.cityProjects?.filter(p => p.completed).length || 0} / {gameState?.cityProjects?.length || 0}
                           </p>
                         </div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex gap-3 items-center">
+                            <Image src={trophy} alt="score" width={28} height={28} className="lg:w-5 lg:h-5 w-7 h-7 object-contain" />
+                            <p className="font-bold font-roboto lg:text-[18px] md:text-[25px] text-[15px] text-black">
+                              Total Score
+                            </p>
+                          </div>
+                          <p className="font-bold font-roboto lg:text-[22px] md:text-[25px] text-[15px] text-black">
+                            {Number(gameState?.teamScore || 0)}
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </div>
+                  {pairDetails?.scoreRanking?.length > 0 && (
+                    <div className="rounded-[10px] mt-6 border border-gray-200">
+                      <div className="flex gap-8 justify-center border-b border-gray-300 lg:py-2 py-2 bg-[#F7F2E8]">
+                        <p className="flex items-center font-bold font-roboto lg:text-[20px] md:text-[24px] text-[18px] text-black">
+                          Final Team Ranking
+                        </p>
+                      </div>
+                      <div className="lg:px-4 lg:py-3 px-3 py-3 overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="border-b border-gray-300">
+                              <th className="py-2 pr-3 font-bold text-black lg:text-[16px] text-[14px]">Rank</th>
+                              <th className="py-2 pr-3 font-bold text-black lg:text-[16px] text-[14px]">Team</th>
+                              <th className="py-2 pr-3 font-bold text-black lg:text-[16px] text-[14px]">Session</th>
+                              <th className="py-2 font-bold text-black lg:text-[16px] text-[14px]">Final Score</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {pairDetails.scoreRanking.map((row: any) => (
+                              <tr key={`${row.team}-${row.sessionId}`} className="border-b border-gray-100">
+                                <td className="py-2 pr-3 font-semibold text-black">#{row.rank}</td>
+                                <td className="py-2 pr-3 text-black">{row.team}</td>
+                                <td className="py-2 pr-3 text-black">{row.sessionId}</td>
+                                <td className="py-2 text-black font-semibold">{Number(row.finalScore || 0).toFixed(2)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                   <div className="flex justify-end mt-auto">
                     <div>
                       <p className="font-roboto lg:text-[14px] md:text-[18px] text-[12px] text-black-500">

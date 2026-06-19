@@ -739,7 +739,7 @@ export default function MunicipalityPage() {
 
                           <div className="mt-2 border-t border-[#E5D7C1] pt-2">
                             <p className="text-[12px] font-semibold text-[#4a3722] mb-1">
-                              Remaining Required Materials
+                              Required Materials Remaining
                             </p>
                             <div className="flex flex-wrap gap-1.5">
                               {(() => {
@@ -762,7 +762,7 @@ export default function MunicipalityPage() {
                                 if (!entries.length) {
                                   return (
                                     <span className="text-[11px] text-[#7A5A34] italic">
-                                      All required materials fulfilled.
+                                      All required materials have been fulfilled.
                                     </span>
                                   );
                                 }
@@ -772,7 +772,7 @@ export default function MunicipalityPage() {
                                     key={`${project.id}-required-${material}`}
                                     className="inline-flex items-center rounded-md bg-[#F7F2EA] px-2 py-1 text-[11px] font-medium text-[#5a442b] border border-[#E6D8C2]"
                                   >
-                                    {MATERIAL_LABELS[material] || material}: {Number(qty || 0).toFixed(1)} tonnes
+                                    {MATERIAL_LABELS[material] || material}: {Number(qty || 0).toFixed(1)} tons
                                   </span>
                                 ));
                               })()}
@@ -786,7 +786,10 @@ export default function MunicipalityPage() {
                                 Health Bonus: +{Number(project.healthBonus || 0).toFixed(1)}%
                               </span>
                               <span className="inline-flex items-center rounded-md bg-[#EEF3FB] px-2 py-1 text-[11px] font-medium text-[#234A8B] border border-[#D6E2F7]">
-                                Budget Bonus: +${Number(project.budgetBonus || 0).toFixed(0)}
+                                Wallet Credit: +${Number(project.budgetBonus || 0).toFixed(0)}
+                              </span>
+                              <span className="inline-flex items-center rounded-md bg-[#F3F0FF] px-2 py-1 text-[11px] font-medium text-[#5B3FA8] border border-[#DED3FB]">
+                                Score Bonus: +{Number((project as any).scoreBonus || 0)}
                               </span>
                             </div>
                           </div>

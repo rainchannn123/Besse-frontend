@@ -492,7 +492,7 @@ export default function MRFCollectionPage() {
         <div className="flex flex-col xl:flex-row xl:items-start gap-4">
           {/* MAIN CONTENT */}
           <div
-            className="bg-cover bg-center mr-auto rounded-[20px] flex flex-col lg:min-h-0 lg:max-h-[calc(100dvh-20.7rem)] overflow-hidden w-full flex-1 min-w-0"
+            className="bg-cover bg-center mr-auto rounded-[20px] flex flex-col lg:min-h-0 lg:max-h-[calc(100vh-21rem)] overflow-hidden w-full flex-1 min-w-0"
             style={{ backgroundImage: `url(${woodenBg.src})` }}
           >
           <MunicipalityCustomHeader

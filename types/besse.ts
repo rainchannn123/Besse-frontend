@@ -429,6 +429,8 @@ export interface GameState {
   currentTurn: number;
   budget: number;
   cityHealth: number;
+  teamScore: number;
+  maxTeamScore: number;
   totalCO2: number;
   wasteInventory: number;
   maxCapacity: number;
@@ -540,6 +542,15 @@ export interface PairDetailsResponse
       teamBBudget: number;
       teamACO2: number;
       teamBCO2: number;
+      teamAScore: number;
+      teamBScore: number;
+      winningTeam: 'Team A' | 'Team B' | 'Tie' | null;
+      scoreRanking: {
+        rank: number;
+        team: 'Team A' | 'Team B';
+        sessionId: string;
+        finalScore: number;
+      }[];
       teamAGameStatus: string; // "active", "lost", "complete"
       teamBGameStatus: string; // "active", "lost", "complete"
       teamAPairStatus: string; // "active", "eliminated"
@@ -632,11 +643,15 @@ export interface CityProject {
   id: string;
   name: string;
   description?: string;
+  requiredMaterials?: Partial<Record<MaterialType, number>>;
   addedMaterials?: Partial<Record<MaterialType, number>>;
   progress: number;
   completed: boolean;
   healthBonus: number;
   budgetBonus: number;
+  scoreBonus: number;
+  difficultyScore?: number;
+  estimatedExternalCost?: number;
   deadline: number;
 }
 

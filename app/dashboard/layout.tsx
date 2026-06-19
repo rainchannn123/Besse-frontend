@@ -187,6 +187,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           wasteInventory={(gameState as any).wasteInventory || 0}
           maxCapacity={(gameState as any).maxCapacity || 150}
           totalCO2={gameState.totalCO2}
+          teamScore={(gameState as any).teamScore || 0}
+          maxTeamScore={(gameState as any).maxTeamScore || 0}
         />
       ) : (
         <Footer />
