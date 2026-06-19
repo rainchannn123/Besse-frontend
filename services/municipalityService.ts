@@ -22,6 +22,18 @@ export const municipalityService = {
     return response.data;
   },
 
+  // NEW: Collect waste with transport mode (fast/slow)
+  async collectWasteWithTransport(
+    sessionId: string,
+    data: { batchId: string; sessionId: string; mode: 'fast' | 'slow' }
+  ): Promise<CollectWasteResponse> {
+    const response = await api.post<CollectWasteResponse>(
+      `/municipality/collect-waste-transport/${sessionId}`,
+      data
+    );
+    return response.data;
+  },
+
   async rejectWaste(data: RejectWasteRequest): Promise<RejectWasteResponse> {
     const response = await api.post<RejectWasteResponse>('/municipality/reject-waste', data);
     return response.data;

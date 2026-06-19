@@ -1,281 +1,299 @@
 'use client';
 
+import React, { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuthStore } from '@/stores/authStore';
+import { useNotificationStore } from '@/stores/notificationStore';
+import { Plus, RefreshCw, Users, Loader2 } from 'lucide-react';
+import AvailableRoomsTable from '@/components/ui/pairing/AvailableRoomsTable';
 import CustomHeader from '@/components/layout/header/customheader/CustomHeader';
-import GameModeBadge from '@/components/ui/GameModeBadge';
 import woodenBg from '@/public/assets/images/wooden_bg.png';
 import woodenHeading from '@/public/assets/images/woodenHeading.png';
-import { useAuthStore } from '@/stores/authStore';
-import { useRouter } from 'next/navigation';
-import { use, useCallback, useEffect, useState } from 'react';
-import { PairingQueue } from '../../../components/ui/pairing/PairingQueue';
-import { PairingStatus } from '../../../components/ui/pairing/PairingStatus';
-import { PairingWaitingRoom } from '../../../components/ui/pairing/PairingWaitingRoom';
-import { usePairingSystem } from '../../../hooks/usePairingSystem';
-import { useWebSocket } from '../../../hooks/useWebSocket';
-import { gameService } from '../../../services/gameService';
-import { lobbyService } from '../../../services/lobbyService';
-import { useUserStore } from '../../../stores/userStore';
-import styles from './page.module.css';
 
-interface PairingPageProps {
-  searchParams: Promise<{
-    sessionId?: string;
-  }>;
+interface WaitingRoom {
+  roomCode: string;
+  createdAt: string;
+  teams: {
+    teamName: string;
+    players: { name: string; userId: string; role: string | null }[];
+    sessionId: string;
+  }[];
+  status: string;
 }
 
-export default function PairingPage({ searchParams }: PairingPageProps) {
+export default function PairingDashboardPage() {
   const router = useRouter();
-  const { currentUser, updateUser } = useUserStore();
-  const params = use(searchParams);
   const { user } = useAuthStore();
-  const { subscribe, joinGame, isConnected } = useWebSocket();
-  const sessionId =
-    params?.sessionId || localStorage.getItem('pairing_session_id') || user?.currentSession;
-  if (sessionId && !params?.sessionId && localStorage.getItem('pairing_session_id') === sessionId) {
-    localStorage.removeItem('pairing_session_id');
-  }
-  // console.log('Pairing Page sessionId:', sessionId);
-  const [isStartingGame, setIsStartingGame] = useState(false);
-  const [autoStartCountdown, setAutoStartCountdown] = useState<number | null>(null);
-  const [isLeader, setIsLeader] = useState(false);
-  const [gameMode, setGameMode] = useState<string | null>(null);
+  const { addNotification } = useNotificationStore();
+  const [availableRooms, setAvailableRooms] = useState<WaitingRoom[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isCreating, setIsCreating] = useState(false);
+  const [checkingExisting, setCheckingExisting] = useState(true);
 
-  const {
-    pairingStatus,
-    isLoading,
-    partnerMetrics,
-    joinPairingQueue,
-    leavePairingQueue,
-    getPairingResult,
-  } = usePairingSystem(sessionId!, true);
-  // console.log(sessionId);
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
+  // Check if this team already has a waiting room
   useEffect(() => {
-    const checkLeader = async () => {
-      if (!sessionId || !user?._id) {
-        setIsLeader(false);
+    const checkExistingRoom = async () => {
+      if (!user?.currentSession) {
+        setCheckingExisting(false);
         return;
       }
-
+      
       try {
-        const response = await lobbyService.getLobbyState(sessionId);
-        const leaderId = response.data?.lobbyState?.leader;
-        setIsLeader(leaderId === user._id);
-        setGameMode((response.data?.lobbyState as any)?.gameMode || 'waste');
+        const token = localStorage.getItem('auth_token');
+        const response = await fetch(`${API_URL}/waiting-rooms/available`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await response.json();
+        
+        if (data.success && data.data?.rooms) {
+          // Check if any room has this team's session
+          const existingRoom = data.data.rooms.find((room: any) =>
+            room.teams?.some((t: any) => t.sessionId === user.currentSession)
+          );
+          if (existingRoom) {
+            console.log('✅ Found existing room, redirecting:', existingRoom.roomCode);
+            window.location.href = `/dashboard/waiting-room/${existingRoom.roomCode}`;
+            return;
+          }
+        }
       } catch (error) {
-        console.error('Failed to verify lobby leader:', error);
-        setIsLeader(false);
+        console.error('Error checking existing room:', error);
+      } finally {
+        setCheckingExisting(false);
       }
     };
+    
+    checkExistingRoom();
+  }, [user?.currentSession, API_URL]);
 
-    void checkLeader();
-  }, [sessionId, user?._id]);
-
-  const handleJoinQueueAsLeaderOnly = useCallback(async () => {
-    if (!isLeader) {
-      return false;
+  const fetchAvailableRooms = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${API_URL}/waiting-rooms/available`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+      if (data.success) {
+        setAvailableRooms(data.data?.rooms || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch available rooms:', error);
+    } finally {
+      setIsLoading(false);
     }
-
-    return joinPairingQueue();
-  }, [isLeader, joinPairingQueue]);
+  }, [API_URL]);
 
   useEffect(() => {
-    // If not paired and sessionId exists, check for existing pairing result
-    if (!pairingStatus?.isPaired && sessionId) {
-      getPairingResult();
-    }
-  }, [sessionId, pairingStatus?.isPaired, getPairingResult]);
+    fetchAvailableRooms();
+    const interval = setInterval(fetchAvailableRooms, 10000);
+    return () => clearInterval(interval);
+  }, [fetchAvailableRooms]);
 
-  // Join WebSocket room when session is available and connected
-  // This is CRITICAL - we must join the room to receive teams-paired events
-  useEffect(() => {
-    if (sessionId && isConnected) {
-      // console.log('Pairing page: Joining game room for sessionId:', sessionId);
-      joinGame(sessionId);
-    }
-
-    // Cleanup: leave the room when component unmounts or sessionId changes
-    return () => {
-      if (sessionId) {
-        // console.log('Pairing page: Cleanup - would leave game room for sessionId:', sessionId);
-        // Note: We don't actually call leaveGame here to avoid disconnecting
-        // if user is navigating to game page
-      }
-    };
-  }, [sessionId, isConnected, joinGame]);
-
-  // CRITICAL: Listen for teams-paired event directly on this page
-  // This ensures we catch the event even if usePairingSystem doesn't update in time
-  useEffect(() => {
-    if (!sessionId) return;
-
-    const handleTeamsPaired = (data: any) => {
-      // console.log('🎯🎯🎯 Pairing page: TEAMS-PAIRED EVENT RECEIVED 🎯🎯🎯');
-      // console.log('Pairing page: Event data:', JSON.stringify(data, null, 2));
-      // console.log('Pairing page: My sessionId:', sessionId);
-      // console.log('Pairing page: Partner sessionId:', data.partnerSessionId);
-      // console.log('Pairing page: My team role:', data.teamRole);
-      // console.log('Pairing page: Pair ID:', data.pairId);
-
-      // Force update the pairing status in the store
-      // This will trigger the UI to change from waiting to paired state
-      if (data.pairId && data.partnerSessionId && data.teamRole) {
-        // console.log('Pairing page: All required data present, UI should update now');
-        // The usePairingSystem should handle this, but we log it here to debug
-      }
-    };
-
-    // console.log('Pairing page: Setting up teams-paired listener for sessionId:', sessionId);
-    const unsubscribe = subscribe('teams-paired', handleTeamsPaired);
-
-    return () => {
-      // console.log('Pairing page: Cleaning up teams-paired listener');
-      if (unsubscribe) {
-        unsubscribe();
-      }
-    };
-  }, [sessionId, subscribe]);
-
-  // Listen for game-state-full or game-state-update events (game actually started)
-  useEffect(() => {
-    const unsubGameStateFull = subscribe('game-state-full', (data: any) => {
-      if (data?.gameState && data.gameState.gameStatus === 'active') {
-        // console.log('Game is now active, auto-redirecting...');
-        // Game has started, trigger navigation
-        if (autoStartCountdown === null) {
-          setAutoStartCountdown(3); // Quick countdown before redirect
-        }
-      }
-    });
-
-    const unsubGameStateUpdate = subscribe('game-state-update', (data: any) => {
-      if (data?.gameState && data.gameState.gameStatus === 'active') {
-        // console.log('Game state updated to active, auto-redirecting...');
-        if (autoStartCountdown === null) {
-          setAutoStartCountdown(3);
-        }
-      }
-    });
-
-    return () => {
-      if (unsubGameStateFull) {
-        unsubGameStateFull();
-      }
-      if (unsubGameStateUpdate) {
-        unsubGameStateUpdate();
-      }
-    };
-  }, [subscribe, autoStartCountdown]);
-
-  // Auto-start countdown when paired
-  useEffect(() => {
-    if (pairingStatus?.isPaired && autoStartCountdown === null) {
-      setAutoStartCountdown(5);
-    }
-  }, [pairingStatus?.isPaired, autoStartCountdown]);
-
-  const handleStartGame = useCallback(async () => {
-    if (!sessionId) {
-      console.error('No session ID');
+  const handleCreateRoom = async () => {
+    if (!user?.currentSession) {
+      addNotification({
+        message: 'Please complete role selection first',
+        type: 'error',
+      });
+      router.push('/dashboard/role');
       return;
     }
 
-    setIsStartingGame(true);
+    setIsCreating(true);
     try {
-      // Call getGameState API
-      const response = await gameService.getGameState(sessionId);
-      if (response.success && response.data?.gameState) {
-        const gameState = response.data.gameState;
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${API_URL}/waiting-rooms/create`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          sessionId: user.currentSession,
+          teamName: user.name,
+        }),
+      });
+      const data = await response.json();
 
-        // Store initial state
-        const { secureStorage } = await import('@/utils/secureStorage');
-        secureStorage.setItem('init_state', JSON.stringify(gameState));
-        localStorage.setItem('current_game_session', sessionId);
-        // Determine user role — prefer currentUser but fall back to authStore user
-        const userId = currentUser?._id || user?._id;
-        let userRole: string | null = null;
-        if (userId && gameState.players) {
-          for (const [role, playerId] of Object.entries(gameState.players)) {
-            if (playerId === userId) {
-              userRole = role;
-              break;
+      if (data.success) {
+        addNotification({
+          message: `Waiting room created! Code: ${data.data.waitingRoom.roomCode}`,
+          type: 'success',
+        });
+        window.location.href = `/dashboard/waiting-room/${data.data.waitingRoom.roomCode}`;
+      } else {
+        addNotification({
+          message: data.message || 'Failed to create waiting room',
+          type: 'error',
+        });
+      }
+    } catch (error: any) {
+      addNotification({
+        message: error.message || 'Failed to create waiting room',
+        type: 'error',
+      });
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  // ✅ UPDATED: Handle join room with auto-redirect
+  const handleJoinRoom = async (roomCode: string) => {
+    if (!user?.currentSession) {
+      addNotification({
+        message: 'Please complete role selection first',
+        type: 'error',
+      });
+      router.push('/dashboard/role');
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('auth_token');
+      
+      // ✅ First, check if this team already has a waiting room
+      const checkResponse = await fetch(`${API_URL}/waiting-rooms/available`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const checkData = await checkResponse.json();
+      
+      if (checkData.success && checkData.data?.rooms) {
+        // Check if this team already has a room
+        const existingRoom = checkData.data.rooms.find((room: any) =>
+          room.teams?.some((t: any) => t.sessionId === user.currentSession)
+        );
+        
+        if (existingRoom) {
+          // ✅ Auto-redirect to existing room
+          addNotification({
+            message: `You are already in a waiting room. Redirecting...`,
+            type: 'info',
+          });
+          window.location.href = `/dashboard/waiting-room/${existingRoom.roomCode}`;
+          return;
+        }
+      }
+      
+      // ✅ If no existing room, proceed to join
+      const response = await fetch(`${API_URL}/waiting-rooms/join`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          roomCode,
+          sessionId: user.currentSession,
+          teamName: user.name,
+        }),
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        addNotification({
+          message: `Joined room ${roomCode}!`,
+          type: 'success',
+        });
+        window.location.href = `/dashboard/waiting-room/${roomCode}`;
+      } else {
+        // ✅ If the error is "already has active waiting room", redirect to that room
+        if (data.message?.includes('already has an active waiting room')) {
+          // Try to find the existing room and redirect
+          try {
+            const refreshResponse = await fetch(`${API_URL}/waiting-rooms/available`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            const refreshData = await refreshResponse.json();
+            
+            if (refreshData.success && refreshData.data?.rooms) {
+              const existingRoom = refreshData.data.rooms.find((room: any) =>
+                room.teams?.some((t: any) => t.sessionId === user.currentSession)
+              );
+              if (existingRoom) {
+                addNotification({
+                  message: `You are already in a waiting room. Redirecting...`,
+                  type: 'info',
+                });
+                window.location.href = `/dashboard/waiting-room/${existingRoom.roomCode}`;
+                return;
+              }
             }
+          } catch (refreshError) {
+            console.error('Failed to find existing room:', refreshError);
           }
         }
-        // Update user store with current session
-        updateUser({ currentSession: sessionId });
-        if (userRole === 'broker') {
-          router.push('/dashboard/broker-inventory');
-        } else if (userRole === 'mrf') {
-          router.push('/dashboard/mrf-collection');
-        } else {
-          router.push('/dashboard/municipality');
-        }
-      } else {
-        console.error('Failed to get game state:', response.message);
-        setIsStartingGame(false);
+        
+        addNotification({
+          message: data.message || 'Failed to join waiting room',
+          type: 'error',
+        });
       }
-    } catch (error) {
-      console.error('Failed to get game state:', error);
-      setIsStartingGame(false);
+    } catch (error: any) {
+      addNotification({
+        message: error.message || 'Failed to join waiting room',
+        type: 'error',
+      });
     }
-  }, [sessionId, currentUser?._id, router, updateUser]);
+  };
 
-  // Countdown timer
-  useEffect(() => {
-    if (autoStartCountdown && autoStartCountdown > 0) {
-      const timer = setTimeout(() => {
-        setAutoStartCountdown(autoStartCountdown - 1);
-      }, 1000);
-      return () => clearTimeout(timer);
-    } else if (autoStartCountdown === 0) {
-      handleStartGame();
-    }
-  }, [autoStartCountdown, handleStartGame]);
+  if (checkingExisting) {
+    return (
+      <div className="min-h-screen bg-[#f5efe2] flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-[#50704C]" />
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bgColor p-6">
-      <div
-        className="bg-cover bg-center container mx-auto rounded-[20px] relative w-full"
-        style={{
-          backgroundImage: `url(${woodenBg.src})`,
-        }}
-      >
-        <CustomHeader
-          backgroundImage={woodenHeading.src}
-          title="Team Pairing"
-          subtitle="Find your game partner and start playing"
-        />
-        <GameModeBadge gameMode={gameMode} />
+    <div className="min-h-screen bg-gradient-to-br from-[#efe4d2] via-[#f8f1e6] to-[#e8dcc7] p-4 md:p-8">
+      <div className="mx-auto max-w-[1200px] space-y-6">
+        <div
+          className="bg-cover bg-center rounded-[20px] overflow-hidden"
+          style={{ backgroundImage: `url(${woodenBg.src})` }}
+        >
+          <CustomHeader
+            backgroundImage={woodenHeading.src}
+            title="Game Lobby"
+            subtitle="Create or join a waiting room to find your opponent"
+          />
 
-        <div className="md:px-8 px-4 pt-16 pb-6">
-          {/* Pairing States */}
-          <div className={styles.page}>
-            {!pairingStatus?.isInQueue && !pairingStatus?.isPaired ? (
-              <PairingQueue
-                onJoinQueue={handleJoinQueueAsLeaderOnly}
+          <div className="p-6 space-y-6">
+            {/* Action Buttons */}
+            <div className="flex flex-wrap gap-4 justify-between items-center">
+              <button
+                onClick={handleCreateRoom}
+                disabled={isCreating}
+                className="flex items-center gap-2 px-6 py-3 bg-[#50704C] text-white rounded-lg hover:bg-[#3A7D2C] transition-colors font-semibold disabled:opacity-50"
+              >
+                <Plus size={20} />
+                {isCreating ? 'Creating...' : 'Create New Room'}
+              </button>
+
+              <button
+                onClick={fetchAvailableRooms}
+                className="flex items-center gap-2 px-4 py-2 border border-[#5b7f3b] rounded-lg text-[#2e4a1f] hover:bg-[#eef8e4] transition-colors"
+              >
+                <RefreshCw size={16} />
+                Refresh
+              </button>
+            </div>
+
+            {/* Rooms Table */}
+            <div>
+              <h2 className="text-xl font-bold text-[#4f2d14] mb-4 flex items-center gap-2">
+                <Users size={24} />
+                Available Waiting Rooms
+              </h2>
+              <AvailableRoomsTable
+                rooms={availableRooms}
+                onJoinRoom={handleJoinRoom}
                 isLoading={isLoading}
-                canJoinQueue={isLeader}
-                disabledReason="Only the group leader can start queueing."
               />
-            ) : pairingStatus?.isInQueue && !pairingStatus?.isPaired ? (
-              <PairingWaitingRoom
-                position={pairingStatus.position}
-                estimatedWaitTime={pairingStatus.estimatedWaitTime}
-                onLeavingQueue={leavePairingQueue}
-                isLoading={isLoading}
-              />
-            ) : pairingStatus?.isPaired ? (
-              <PairingStatus
-                teamRole={pairingStatus.teamRole || 'Team A'}
-                partnerSessionId={pairingStatus.partnerSessionId || ''}
-                pairId={pairingStatus.pairId || ''}
-                partnerMetrics={partnerMetrics}
-                onStartGame={handleStartGame}
-                isLoading={isStartingGame}
-                autoStartCountdown={autoStartCountdown}
-              />
-            ) : null}
+            </div>
           </div>
         </div>
       </div>

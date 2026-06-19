@@ -34,11 +34,8 @@ export default function page() {
   const { subscribe, joinGame, leaveGame } = useGameWebSocket(user?.currentSession || undefined);
 
   const fetchGameState = async () => {
+    // FIXED: Silent return if no active session - no console error
     if (!user?.currentSession) {
-      console.error({
-        message: 'No active session found',
-        type: 'error',
-      });
       setLoading(false);
       return;
     }
@@ -54,16 +51,12 @@ export default function page() {
           fetchPairDetails(response.data.gameState.pairId);
         }
       } else {
-        console.error({
-          message: response.message || 'Failed to fetch game state',
-          type: 'error',
-        });
+        // Silent fail - just log warning instead of error
+        console.warn('Failed to fetch game state:', response.message);
       }
     } catch (err: any) {
-      console.error({
-        message: err.message || 'Failed to fetch game state',
-        type: 'error',
-      });
+      // Silent fail - user might not have an active game
+      console.debug('No active game session:', err?.message);
     } finally {
       setLoading(false);
     }
@@ -76,7 +69,7 @@ export default function page() {
         setLobbyCode(response.data.lobbyState.lobbyCode);
       }
     } catch (err: any) {
-      console.error('Failed to fetch lobby code:', err);
+      console.warn('Failed to fetch lobby code:', err?.message);
     }
   };
 
@@ -84,11 +77,10 @@ export default function page() {
     try {
       const response = await gameService.getPairDetails(pairId);
       if (response.success && response.data) {
-        // console.log('Pair Details:', response.data);
         setPairDetails(response.data.pairDetails);
       }
     } catch (err: any) {
-      console.error('Failed to fetch pair details:', err);
+      console.warn('Failed to fetch pair details:', err?.message);
     }
   };
 
@@ -180,7 +172,6 @@ export default function page() {
     if (gameState?.gameStatus === 'complete') {
       return {
         title: 'Game Complete!',
-
         isWin: true,
       };
     }

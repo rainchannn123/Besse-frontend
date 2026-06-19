@@ -8,6 +8,7 @@ import { MunicipalityWasteSelectedBox } from '@/components/ui/selectedBox/Munici
 import ShiftLog from '@/components/ui/shiftLog/ShiftLog';
 import { WasteCollectAction } from '@/components/ui/wasteCollectAction/WasteCollectAction';
 import { SurrenderButton } from '@/components/ui/surrenderButton/SurrenderButton';
+import TransportProgressList from '@/components/ui/TransportProgressList';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import woodenBg from '@/public/assets/images/wooden_bg.png';
 import woodenHead from '@/public/assets/images/woodenHead.png';
@@ -44,9 +45,11 @@ export default function MunicipalityPage() {
   const [gameMode] = useState<string | null>(() =>
     typeof window !== 'undefined' ? localStorage.getItem('game_mode') : null
   );
+  const [activeTransports, setActiveTransports] = useState<any[]>([]);
   const { getCurrentGameSession, notifications, isConnected, subscribe, joinGame, emit } = useWebSocket();
 
   const currentGameState = gameState;
+  
   const fetchGameState = async () => {
     if (!user?.currentSession) {
       setError('No active session found');
@@ -65,7 +68,6 @@ export default function MunicipalityPage() {
         ) {
           router.push('/dashboard/game-over');
         }
-        // Store init_state and current_game_session in localStorage
         localStorage.setItem('init_state', JSON.stringify(response.data.gameState));
         localStorage.setItem('current_game_session', response.data.gameState.sessionId);
       } else {
@@ -110,7 +112,6 @@ export default function MunicipalityPage() {
     fetchCityProjects();
   }, []);
 
-  // Live log items from websocket events (system messages, player actions)
   const [liveLogItems, setLiveLogItems] = useState<
     {
       time: string;
@@ -119,41 +120,35 @@ export default function MunicipalityPage() {
       type?: 'info' | 'warning' | 'error';
     }[]
   >([]);
-  // throttle helper refs for applying full state
   const lastAppliedRef = useRef<number>(0);
   const pendingPayloadRef = useRef<any | null>(null);
   const shiftStartTimeRef = useRef<number>(0);
 
-  // Join the user's current session when websocket connects
   useEffect(() => {
     if (user?.currentSession && isConnected) {
-      // console.log('Municipality page: Calling joinGame with sessionId:', user.currentSession);
       joinGame(user.currentSession);
-    } else {
-      // console.log(
-      //   'Municipality page: Not joining yet - user.currentSession:',
-      //   user?.currentSession,
-      //   'isConnected:',
-      //   isConnected
-      // );
     }
   }, [user?.currentSession, isConnected, joinGame]);
 
-  // Subscribe to realtime events
+  const authoritativeState = fullPayload?.gameState ?? currentGameState;
+
   useEffect(() => {
-    // Game state updates
+    if (authoritativeState?.activeTransports) {
+      setActiveTransports(authoritativeState.activeTransports);
+    }
+  }, [authoritativeState?.activeTransports]);
+
+  useEffect(() => {
     const unsubGameStateUpdate = subscribe('game-state-update', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
 
-        // Update waste batches directly from gameState for real-time updates
         if (data.gameState.wasteBatches) {
           setWasteBatches(
             data.gameState.wasteBatches.filter((batch: WasteBatch) => batch.status === 'PENDING')
           );
         }
 
-        // Check if game is over
         if (
           data.gameState.gameStatus === 'won' ||
           data.gameState.gameStatus === 'lost' ||
@@ -164,19 +159,16 @@ export default function MunicipalityPage() {
       }
     });
 
-    // Full game state with computed extras (authoritative source)
     const unsubGameStateFull = subscribe('game-state-full', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
 
-        // Update waste batches directly from gameState for real-time updates
         if (data.gameState.wasteBatches) {
           setWasteBatches(
             data.gameState.wasteBatches.filter((batch: WasteBatch) => batch.status === 'PENDING')
           );
         }
 
-        // Check if game is over
         if (
           data.gameState.gameStatus === 'won' ||
           data.gameState.gameStatus === 'lost' ||
@@ -186,7 +178,6 @@ export default function MunicipalityPage() {
         }
       }
       if (data?.realtimeUpdate) {
-        // Handle realtime update data if needed
       }
       if (data?.turnSummary) setTurnSummary(data.turnSummary);
       if (data?.statistics) setStatistics(data.statistics);
@@ -195,12 +186,10 @@ export default function MunicipalityPage() {
       setLastActionType(data?.actionType || null);
     });
 
-    // System check updates (30s interval)
     const unsubSystemCheckUpdate = subscribe('system-check-update', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
 
-        // Update waste batches directly from gameState for real-time updates
         if (data.gameState.wasteBatches) {
           setWasteBatches(
             data.gameState.wasteBatches.filter((batch: WasteBatch) => batch.status === 'PENDING')
@@ -209,53 +198,35 @@ export default function MunicipalityPage() {
       }
     });
 
-    // Turn ended
     const unsubTurnEnded = subscribe('turn-ended', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
       }
     });
 
-    // Handle all game actions via game-state-updated event with actionType
     const unsubGameActions = subscribe('game-state-updated', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
 
-        // Update waste batches directly from gameState for real-time updates
         if (data.gameState.wasteBatches) {
           const pendingBatches = data.gameState.wasteBatches.filter(
             (batch: WasteBatch) => batch.status === 'PENDING'
           );
-          // console.log('[Municipality] Updating waste batches from real-time event:', {
-          //   total: data.gameState.wasteBatches.length,
-          //   pending: pendingBatches.length,
-          //   actionType: data?.actionType,
-          // });
           setWasteBatches(pendingBatches);
         }
       }
 
-      // Handle specific actions based on actionType
       const actionType = data?.actionType;
       if (actionType === 'waste-collected' || actionType === 'waste-rejected') {
-        // console.log(
-        //   '[Municipality] Waste action detected - batches already updated from gameState'
-        // );
-        // No need to call fetchWasteBatches() - already updated from gameState above
       } else if (actionType === 'project-constructed') {
-        // console.log('[Municipality] Project constructed - refreshing projects');
         fetchCityProjects();
       }
     });
 
-    // COUNTDOWN EXPIRED EVENT
     const unsubCountdownExpired = subscribe('countdown-expired', (data: any) => {
-      // console.log('Countdown expired received in Municipality page:', data);
-      // Update game state if provided
       if (data?.gameState) {
         setGameState(data.gameState);
 
-        // Check if game is over
         if (
           data.gameState.gameStatus === 'won' ||
           data.gameState.gameStatus === 'lost' ||
@@ -263,34 +234,26 @@ export default function MunicipalityPage() {
         ) {
           setTimeout(() => {
             router.push('/dashboard/game-over');
-          }, 3000); // Redirect after 3 seconds
+          }, 3000);
         }
       }
 
-      // Refresh data
       fetchWasteBatches();
       fetchCityProjects();
     });
 
-    // COUNTDOWN STARTED EVENT
     const unsubCountdownStarted = subscribe('countdown-started', (data: any) => {
-      // console.log('Countdown started received in Municipality page:', data);
-      // Update game state if provided to start the countdown
       if (data?.gameState) {
         setGameState(data.gameState);
       }
     });
 
-    // COUNTDOWN CANCELLED EVENT
     const unsubCountdownCancelled = subscribe('countdown-cancelled', (data: any) => {
-      // console.log('Countdown cancelled received in Municipality page:', data);
-      // Update game state if provided to clear the countdown
       if (data?.gameState) {
         setGameState(data.gameState);
       }
     });
 
-    // Player actions for live log
     const unsubPlayerAction = subscribe('player-action', (data: any) => {
       const time = getCountdownTime();
       const message = data?.playerName
@@ -299,27 +262,47 @@ export default function MunicipalityPage() {
       setLiveLogItems((prev) => [...prev, { time, message, isLive: true }].slice(-100));
     });
 
-    // TEMPORARILY COMMENTED OUT - system messages for live log
-    const unsubSystemMessage = subscribe('system-message', (_data: any) => {
-      // const time = getCountdownTime();
-      // setLiveLogItems((prev) =>
-      //   [...prev, { time, message: data.message, isLive: true, type: data.type }].slice(-100)
-      // );
-    });
+    const unsubSystemMessage = subscribe('system-message', (_data: any) => {});
 
     const unsubAuctionsResolved = subscribe('auctions-resolved', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
       }
     });
-    //external-purchase
+
     const unsubExternalPurchase = subscribe('external-purchase', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
       }
     });
 
-    // Surrender vote updates from other players
+    const unsubTransportStarted = subscribe('transport-started', (data: any) => {
+      if (data?.gameState) {
+        setGameState(data.gameState);
+        if (data.gameState.activeTransports) {
+          setActiveTransports(data.gameState.activeTransports);
+        }
+      }
+      addNotification({
+        message: `🚛 ${data?.mode?.toUpperCase()} transport started! ${data?.batchMass?.toFixed(1)} tons will arrive in ${data?.durationSec || 30}s`,
+        type: 'info',
+      });
+    });
+
+    const unsubTransportCompleted = subscribe('transport-completed', (data: any) => {
+      if (data?.gameState) {
+        setGameState(data.gameState);
+        if (data.gameState.activeTransports) {
+          setActiveTransports(data.gameState.activeTransports);
+        }
+      }
+      addNotification({
+        message: `✅ Transport completed! ${data?.batchMass?.toFixed(1)} tons delivered to MRF.`,
+        type: 'success',
+      });
+      fetchWasteBatches();
+    });
+
     const unsubSurrenderUpdate = subscribe('surrender-update', (data: any) => {
       if (data?.surrenderVotes && gameState) {
         setGameState((prev) => prev ? { ...prev, surrenderVotes: data.surrenderVotes } : prev);
@@ -339,11 +322,12 @@ export default function MunicipalityPage() {
       unsubSystemMessage && unsubSystemMessage();
       unsubAuctionsResolved && unsubAuctionsResolved();
       unsubExternalPurchase && unsubExternalPurchase();
+      unsubTransportStarted && unsubTransportStarted();
+      unsubTransportCompleted && unsubTransportCompleted();
       unsubSurrenderUpdate && unsubSurrenderUpdate();
     };
-  }, [subscribe, router, fetchWasteBatches, fetchCityProjects]);
+  }, [subscribe, router, fetchWasteBatches, fetchCityProjects, addNotification]);
 
-  // Compute countdown-style timestamps for static logs
   const getDurationMinutes = () => {
     const c = currentGameState?.constants as any;
     if (c?.REAL_TIME_GAME_DURATION_MINUTES) return c.REAL_TIME_GAME_DURATION_MINUTES;
@@ -354,24 +338,8 @@ export default function MunicipalityPage() {
     return 15;
   };
   const totalDurMin = getDurationMinutes();
-  // TEMPORARILY COMMENTED OUT - static activity log messages
-  // const staticLogData =
-  //   currentGameState?.activityLog?.map((log, index) => {
-  //     const elapsedMin = ((index + 1) / (currentGameState.activityLog?.length || 1)) * (currentGameState.minutesElapsed || 0);
-  //     const remainMin = Math.max(0, totalDurMin - elapsedMin);
-  //     const remMins = Math.floor(remainMin);
-  //     const remSecs = Math.floor((remainMin - remMins) * 60);
-  //     return {
-  //       time: `[${String(remMins).padStart(2, '0')}:${String(remSecs).padStart(2, '0')}]`,
-  //       message: log,
-  //     };
-  //   })?.reverse() || [];
   const staticLogData: { time: string; message: string }[] = [];
 
-  // Use authoritative state from `fullPayload` when available
-  const authoritativeState = fullPayload?.gameState ?? currentGameState;
-
-  // Create selectable materials from municipalInventory
   const selectableMaterials = authoritativeState?.municipalInventory
     ? Object.entries(authoritativeState.municipalInventory)
         .filter(([_, amount]) => (amount as number) >= 0.01)
@@ -387,10 +355,8 @@ export default function MunicipalityPage() {
         }))
     : [];
 
-  // For formatted logs, merge static activity log with live websocket logs
   const logData = [...staticLogData, ...liveLogItems];
 
-  // Derived UI: combine summaries for display
   const turn = turnSummary || null;
   const stats = statistics || null;
 
@@ -402,7 +368,6 @@ export default function MunicipalityPage() {
     ? Date.now() - (authoritativeState.minutesElapsed || 0) * 60 * 1000
     : 0;
 
-  // Keep ref in sync for use in websocket callbacks (avoids re-subscription)
   useEffect(() => {
     shiftStartTimeRef.current = typeof shiftStartTime === 'number' ? shiftStartTime : 0;
   }, [shiftStartTime]);
@@ -454,70 +419,89 @@ export default function MunicipalityPage() {
       </div>
     );
   }
-  const handleCollectWaste = async () => {
-    if (!user?.currentSession) {
+
+  const handleCollectWasteWithTransport = async (mode: 'fast' | 'slow') => {
+    console.log('=== handleCollectWasteWithTransport CALLED ===');
+    console.log('mode:', mode);
+    console.log('user:', user);
+    console.log('currentSession:', user?.currentSession);
+    console.log('selectedItem:', selectedItem);
+    
+    if (!user?.currentSession || !selectedItem || !('status' in selectedItem)) {
+      console.log('FAILED: No active session or no batch selected');
       addNotification({
-        message: 'No active session',
+        message: 'No active session or no batch selected',
         type: 'error',
       });
       return;
     }
 
-    // Check if selectedItem is a WasteBatch (has status property)
-    if (selectedItem && 'status' in selectedItem) {
-      if (selectedItem.status === 'PENDING') {
-        // Pre-check: ensure sufficient budget before attempting collection
-        const constants = authoritativeState?.constants;
-        const costPerTon =
-          (constants?.FIXED_DISTANCE_TO_MRF_KM ?? 10) *
-          (constants?.TRANSPORT_COST_PER_TON_KM ?? 2.5);
-        const estimatedCost = (selectedItem as WasteBatch).mass * costPerTon;
-        const currentBudget = authoritativeState?.budget ?? 0;
-        if (currentBudget < estimatedCost) {
-          addNotification({
-            message: `Insufficient budget. This collection costs $${estimatedCost.toFixed(2)} but your budget is $${currentBudget.toFixed(2)}.`,
-            type: 'error',
-          });
-          return;
-        }
+    console.log('selectedItem.status:', selectedItem.status);
+    
+    if (selectedItem.status !== 'PENDING') {
+      console.log('FAILED: Batch status is not PENDING');
+      addNotification({
+        message: `Batch is already ${selectedItem.status}`,
+        type: 'error',
+      });
+      return;
+    }
 
-        try {
-          const response = await municipalityService.collectWaste(user.currentSession, {
-            batchId: selectedItem.id,
-            sessionId: user.currentSession,
-          });
-          if (response.success) {
-            addNotification({
-              message: 'Waste Sent to MRF',
-              type: 'success',
-            });
-            setSelectedItem(null);
-            fetchGameState();
-            fetchWasteBatches();
-          } else {
-            addNotification({
-              message: response.message || 'Failed to collect waste',
-              type: 'error',
-            });
-          }
-        } catch (err: any) {
-          addNotification({
-            message:
-              err?.response?.data?.message ||
-              err?.message ||
-              'Insufficient budget for waste collection',
-            type: 'error',
-          });
+    const mass = (selectedItem as WasteBatch).mass;
+    const cost = mode === 'fast' ? mass * 50 : mass * 25;
+    const currentBudget = authoritativeState?.budget ?? 0;
+
+    console.log('mass:', mass);
+    console.log('cost:', cost);
+    console.log('currentBudget:', currentBudget);
+
+    if (currentBudget < cost) {
+      console.log('FAILED: Insufficient budget');
+      addNotification({
+        message: `Insufficient budget. ${mode} transport costs $${cost.toFixed(2)} but your budget is $${currentBudget.toFixed(2)}.`,
+        type: 'error',
+      });
+      return;
+    }
+
+    console.log('Making API call to:', `/municipality/collect-waste-transport/${user.currentSession}`);
+    console.log('Request body:', {
+      batchId: selectedItem.id,
+      sessionId: user.currentSession,
+      mode: mode,
+    });
+    
+    try {
+      const response = await municipalityService.collectWasteWithTransport(
+        user.currentSession,
+        {
+          batchId: selectedItem.id,
+          sessionId: user.currentSession,
+          mode: mode,
         }
+      );
+      
+      console.log('API response:', response);
+      
+      if (response.success) {
+        addNotification({
+          message: `${mode.toUpperCase()} transport started! Waste will arrive in ${mode === 'fast' ? '30' : '60'} seconds.`,
+          type: 'success',
+        });
+        setSelectedItem(null);
+        fetchGameState();
+        fetchWasteBatches();
       } else {
         addNotification({
-          message: `Batch is already ${selectedItem.status}`,
+          message: response.message || 'Failed to start transport',
           type: 'error',
         });
       }
-    } else {
+    } catch (err: any) {
+      console.error('API error:', err);
+      console.error('Error response:', err?.response);
       addNotification({
-        message: 'Please select a waste batch to collect',
+        message: err?.response?.data?.message || err?.message || 'Failed to start transport',
         type: 'error',
       });
     }
@@ -579,6 +563,9 @@ export default function MunicipalityPage() {
     <div className="lg:h-full flex flex-col lg:overflow-hidden">
       <div className="bg-[#f3e9da] flex-1 flex flex-col lg:min-h-0 lg:overflow-hidden">
         <div className="container mx-auto sm:p-0 px-4 flex flex-col flex-1 lg:min-h-0 lg:overflow-hidden gap-3">
+          
+          <TransportProgressList transports={activeTransports} />
+          
           <div className="flex-shrink-0">
             <ShiftLog
               logs={logData}
@@ -594,7 +581,6 @@ export default function MunicipalityPage() {
             />
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 flex-1 lg:min-h-0 lg:overflow-hidden">
-            {/* Left side */}
             <div className="xl:col-span-3 lg:col-span-2 col-span-1 flex flex-col lg:min-h-0 lg:overflow-hidden">
               <div
                 className="bg-cover bg-center mx-auto rounded-[20px] flex flex-col lg:min-h-0 overflow-hidden w-full flex-1"
@@ -605,7 +591,6 @@ export default function MunicipalityPage() {
                   title={authoritativeState?.teamRole || currentGameState?.teamRole}
                 />
                 <GameModeBadge gameMode={gameMode} />
-                {/* Tab Navigation */}
                 <div className="flex justify-center mb-1 flex-shrink-0">
                   <div className="bg-white rounded-lg p-1 shadow-md">
                     <button
@@ -675,7 +660,6 @@ export default function MunicipalityPage() {
                 </div>
               </div>
             </div>
-            {/* Right side */}
             <div className="xl:col-span-1 lg:col-span-2 col-span-1 lg:overflow-y-auto lg:min-h-0">
               {activeTab === 'waste-collection' ? (
                 selectedItem && 'status' in selectedItem ? (
@@ -687,7 +671,7 @@ export default function MunicipalityPage() {
                     }
                     maxCapacity={authoritativeState?.maxCapacity ?? currentGameState?.maxCapacity}
                     selectedBatch={selectedItem}
-                    handleCollectWaste={handleCollectWaste}
+                    handleCollectWaste={handleCollectWasteWithTransport}
                     transportCostPerTon={
                       (authoritativeState?.constants?.FIXED_DISTANCE_TO_MRF_KM ?? 10) *
                       (authoritativeState?.constants?.TRANSPORT_COST_PER_TON_KM ?? 2.5)
