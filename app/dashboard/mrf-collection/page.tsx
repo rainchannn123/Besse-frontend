@@ -19,7 +19,7 @@ import { gameService } from '@/services/gameService';
 import { mrfService } from '@/services/mrfService';
 import { useAuthStore } from '@/stores/authStore';
 import { useNotificationStore } from '@/stores/notificationStore';
-import { GameState, Material, WasteBatch } from '@/types/besse';
+import { GameState, Material, TeamData, WasteBatch } from '@/types/besse';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -31,6 +31,7 @@ export default function MRFCollectionPage() {
     'collection'
   );
   const [gameState, setGameState] = useState<GameState | null>(null);
+  const [myTeam, setMyTeam] = useState<TeamData | null>(null);
   const [queue, setQueue] = useState<any[]>([]);
   const [inventory, setInventory] = useState<Material[]>([]);
   const [pendingAuctions, setPendingAuctions] = useState<any[]>([]);
@@ -43,6 +44,8 @@ export default function MRFCollectionPage() {
   const [statistics, setStatistics] = useState<any | null>(null);
   const [countdownRemaining, setCountdownRemaining] = useState<number | null>(null);
   const [lastActionType, setLastActionType] = useState<string | null>(null);
+  const [teamTimer, setTeamTimer] = useState<string>('15:00');
+  const [teamCount, setTeamCount] = useState<number>(0);
   const [gameMode] = useState<string | null>(() =>
     typeof window !== 'undefined' ? localStorage.getItem('game_mode') : null
   );
@@ -61,6 +64,20 @@ export default function MRFCollectionPage() {
       const response = await gameService.getGameState(user.currentSession);
       if (response.success && response.data) {
         setGameState(response.data.gameState);
+        
+        // ✅ Find current team
+        const currentTeam = response.data.gameState.teams?.find(
+          (team: TeamData) => team.sessionId === user.currentSession
+        );
+        if (currentTeam) {
+          setMyTeam(currentTeam);
+        }
+        
+        // ✅ Get team count
+        if (response.data.gameState.teams) {
+          setTeamCount(response.data.gameState.teams.length);
+        }
+        
         if (
           response.data.gameState.gameStatus === 'complete' ||
           response.data.gameState.gameStatus === 'won' ||
@@ -126,6 +143,24 @@ export default function MRFCollectionPage() {
     fetchPendingAuctions();
   }, []);
 
+  // ✅ Team timer countdown
+  useEffect(() => {
+    if (!myTeam) return;
+
+    const updateTimer = () => {
+      const now = Date.now();
+      const elapsed = (now - myTeam.teamStartTime) / 60000; // minutes
+      const remaining = Math.max(0, 15 - elapsed);
+      const mins = Math.floor(remaining);
+      const secs = Math.floor((remaining - mins) * 60);
+      setTeamTimer(`${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`);
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [myTeam]);
+
   useEffect(() => {
     setSelectedItem(null);
     setSelectedGrade('');
@@ -161,6 +196,14 @@ export default function MRFCollectionPage() {
     const unsubGameStateUpdate = subscribe('game-state-update', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
+        
+        const currentTeam = data.gameState.teams?.find(
+          (team: TeamData) => team.sessionId === user?.currentSession
+        );
+        if (currentTeam) {
+          setMyTeam(currentTeam);
+        }
+        
         if (
           data.gameState.gameStatus === 'won' ||
           data.gameState.gameStatus === 'lost' ||
@@ -174,6 +217,14 @@ export default function MRFCollectionPage() {
     const unsubGameStateFull = subscribe('game-state-full', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
+        
+        const currentTeam = data.gameState.teams?.find(
+          (team: TeamData) => team.sessionId === user?.currentSession
+        );
+        if (currentTeam) {
+          setMyTeam(currentTeam);
+        }
+        
         if (
           data.gameState.gameStatus === 'won' ||
           data.gameState.gameStatus === 'lost' ||
@@ -194,6 +245,13 @@ export default function MRFCollectionPage() {
     const unsubSystemCheckUpdate = subscribe('system-check-update', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
+        
+        const currentTeam = data.gameState.teams?.find(
+          (team: TeamData) => team.sessionId === user?.currentSession
+        );
+        if (currentTeam) {
+          setMyTeam(currentTeam);
+        }
       }
     });
 
@@ -206,6 +264,13 @@ export default function MRFCollectionPage() {
     const unsubGameActions = subscribe('game-state-updated', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
+        
+        const currentTeam = data.gameState.teams?.find(
+          (team: TeamData) => team.sessionId === user?.currentSession
+        );
+        if (currentTeam) {
+          setMyTeam(currentTeam);
+        }
       }
 
       const actionType = data?.actionType;
@@ -229,6 +294,7 @@ export default function MRFCollectionPage() {
     const unsubCountdownExpired = subscribe('countdown-expired', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
+        
         if (
           data.gameState.gameStatus === 'won' ||
           data.gameState.gameStatus === 'lost' ||
@@ -260,7 +326,7 @@ export default function MRFCollectionPage() {
       const st = shiftStartTimeRef.current;
       const elapsed = st ? Math.max(0, Date.now() - new Date(st).getTime()) : 0;
       let durationMin = 15;
-      try { const stored = localStorage.getItem('init_state'); if (stored) { const p = JSON.parse(stored); if (p?.constants?.REAL_TIME_GAME_DURATION_MINUTES) durationMin = p.constants.REAL_TIME_GAME_DURATION_MINUTES; } } catch {}
+      try { const stored = localStorage.getItem('init_state'); if (stored) { const p = JSON.parse(stored); if (p?.constants?.TEAM_GAME_DURATION_MINUTES) durationMin = p.constants.TEAM_GAME_DURATION_MINUTES; } } catch {}
       const remainingMs = Math.max(0, durationMin * 60 * 1000 - elapsed);
       const mins = Math.floor(remainingMs / 60000);
       const secs = Math.floor((remainingMs % 60000) / 1000);
@@ -274,8 +340,9 @@ export default function MRFCollectionPage() {
     const unsubSystemMessage = subscribe('system-message', (_data: any) => {});
 
     const unsubSurrenderUpdate = subscribe('surrender-update', (data: any) => {
-      if (data?.surrenderVotes) {
-        setGameState((prev) => prev ? { ...prev, surrenderVotes: data.surrenderVotes } : prev);
+      if (data?.surrenderVotes && myTeam) {
+        const updatedTeam = { ...myTeam, surrenderVotes: data.surrenderVotes };
+        setMyTeam(updatedTeam);
       }
     });
 
@@ -292,14 +359,14 @@ export default function MRFCollectionPage() {
       unsubSystemMessage && unsubSystemMessage();
       unsubSurrenderUpdate && unsubSurrenderUpdate();
     };
-  }, [subscribe, router, fetchQueue, fetchInventory, fetchPendingAuctions]);
+  }, [subscribe, router, fetchQueue, fetchInventory, fetchPendingAuctions, myTeam]);
 
   const getDurationMinutes = () => {
     const c = currentGameState?.constants as any;
-    if (c?.REAL_TIME_GAME_DURATION_MINUTES) return c.REAL_TIME_GAME_DURATION_MINUTES;
+    if (c?.TEAM_GAME_DURATION_MINUTES) return c.TEAM_GAME_DURATION_MINUTES;
     try {
       const stored = localStorage.getItem('init_state');
-      if (stored) { const p = JSON.parse(stored); if (p?.constants?.REAL_TIME_GAME_DURATION_MINUTES) return p.constants.REAL_TIME_GAME_DURATION_MINUTES; }
+      if (stored) { const p = JSON.parse(stored); if (p?.constants?.TEAM_GAME_DURATION_MINUTES) return p.constants.TEAM_GAME_DURATION_MINUTES; }
     } catch {}
     return 15;
   };
@@ -332,7 +399,7 @@ export default function MRFCollectionPage() {
     setLiveLogItems((prev) => [...prev, log].slice(-100));
   }, []);
 
-  const availableBatches = ((gameState as any)?.wasteBatches || []).filter((batch: WasteBatch) =>
+  const availableBatches = (myTeam?.wasteBatches || []).filter((batch: WasteBatch) =>
     queue.some((q) => q.batchId === batch.id)
   );
 
@@ -363,6 +430,14 @@ export default function MRFCollectionPage() {
   }
 
   const handleProcessWaste = async () => {
+    if (myTeam?.isEliminated) {
+      addNotification({
+        message: 'Your team has been eliminated. Cannot process waste.',
+        type: 'error',
+      });
+      return;
+    }
+
     if (selectedItem && user?.currentSession) {
       const queueItem = queue.find((q) => q.batchId === selectedItem.id);
       if (!queueItem) {
@@ -395,6 +470,14 @@ export default function MRFCollectionPage() {
   };
 
   const handleAssignGrade = async (grade: string) => {
+    if (myTeam?.isEliminated) {
+      addNotification({
+        message: 'Your team has been eliminated. Cannot assign grades.',
+        type: 'error',
+      });
+      return;
+    }
+
     if (selectedItem && 'type' in selectedItem && user?.currentSession) {
       const response = await mrfService.assignGrade({
         materialId: selectedItem.id,
@@ -425,6 +508,14 @@ export default function MRFCollectionPage() {
   };
 
   const handleAssignGradeAndPrice = async (grade: string, customPrice: number) => {
+    if (myTeam?.isEliminated) {
+      addNotification({
+        message: 'Your team has been eliminated. Cannot activate auctions.',
+        type: 'error',
+      });
+      return;
+    }
+
     if (selectedItem && 'materialType' in selectedItem && user?.currentSession) {
       const response = await mrfService.assignGrade({
         auctionId: selectedItem.auctionId,
@@ -465,10 +556,10 @@ export default function MRFCollectionPage() {
               shiftStartTime={authoritativeState?.gameStartTime}
               gameOverCountdown={authoritativeState?.gameOverCountdown}
               onGameOver={() => router.push('/dashboard/game-over')}
-              cityHealth={authoritativeState?.cityHealth}
-              budget={authoritativeState?.budget}
-              totalCO2={authoritativeState?.totalCO2}
-              wasteInventory={authoritativeState?.wasteInventory}
+              cityHealth={myTeam?.cityHealth}
+              budget={myTeam?.budget}
+              totalCO2={myTeam?.totalCO2}
+              wasteInventory={myTeam?.wasteInventory}
               onStatusLog={handleStatusLog}
             />
           </div>
@@ -480,9 +571,27 @@ export default function MRFCollectionPage() {
           >
             <MunicipalityCustomHeader
               backgroundImage={woodenHead.src}
-              title={authoritativeState?.teamRole || currentGameState?.teamRole}
+              title={`${myTeam?.teamName || 'Your City'} (${myTeam?.citySlot || '?'}) | ${teamCount} Teams`}
             />
             <GameModeBadge gameMode={gameMode} />
+            
+            {/* ✅ Team Timer Display */}
+            <div className="flex justify-center my-1 flex-shrink-0">
+              <div className="bg-white rounded-lg px-4 py-1 shadow-md border border-[#A99065]">
+                <span className="font-bold text-[#33552C]">
+                  ⏱️ Time Remaining: 
+                  <span className={`ml-2 ${parseInt(teamTimer) < 3 ? 'text-red-600 animate-pulse' : 'text-[#50704C]'}`}>
+                    {teamTimer}
+                  </span>
+                </span>
+                {myTeam?.isEliminated && (
+                  <span className="ml-4 text-red-600 font-bold">💀 ELIMINATED</span>
+                )}
+                {myTeam?.gameStatus === 'completed' && (
+                  <span className="ml-4 text-green-600 font-bold">✅ COMPLETED</span>
+                )}
+              </div>
+            </div>
             
             {/* Tab Navigation */}
             <div className="flex justify-center mb-3 flex-shrink-0 mt-2">
@@ -533,7 +642,7 @@ export default function MRFCollectionPage() {
               
               {activeTab === 'analytics' && (
                 <MRFAnalytics
-                  wasteBatches={gameState?.wasteBatches || []}
+                  wasteBatches={myTeam?.wasteBatches || []}
                   inventory={inventory}
                 />
               )}
@@ -555,8 +664,8 @@ export default function MRFCollectionPage() {
       <div className="fixed right-4 top-1/2 transform -translate-y-1/2 z-10 w-80">
         {activeTab === 'collection' && selectedItem && 'status' in selectedItem && (
           <MRFCollect
-            budget={authoritativeState?.budget ?? currentGameState?.budget}
-            totalCO2={authoritativeState?.totalCO2 ?? (currentGameState?.totalCO2 || 0)}
+            budget={myTeam?.budget ?? 0}
+            totalCO2={myTeam?.totalCO2 ?? 0}
             selectedItem={selectedItem}
             handleProcessWaste={handleProcessWaste}
           />
@@ -572,8 +681,8 @@ export default function MRFCollectionPage() {
       
       <SurrenderButton
         playerId={user?._id ?? ''}
-        surrenderVotes={authoritativeState?.surrenderVotes ?? []}
-        canSurrender={(authoritativeState?.minutesElapsed ?? 0) >= 15}
+        surrenderVotes={myTeam?.surrenderVotes ?? []}
+        canSurrender={(myTeam?.minutesElapsed ?? 0) >= 15}
         onToggle={() => {
           if (user?.currentSession) emit('surrender-toggle', { sessionId: user.currentSession });
         }}

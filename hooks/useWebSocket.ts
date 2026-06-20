@@ -22,7 +22,18 @@ export const useWebSocket = () => {
   const [pairData, setPairData] = useState<any>(null);
   const router = useRouter();
 
+  // ✅ Check if this is an admin page
+  const isAdminPage = typeof window !== 'undefined' && 
+    (window.location.pathname?.startsWith('/admin') || 
+     window.location.pathname?.startsWith('/dashboard/admin-game-room/'));
+
   useEffect(() => {
+    // ✅ Skip WebSocket connection for admin pages
+    if (isAdminPage) {
+      console.log('[useWebSocket] Skipping WebSocket for admin page:', window.location.pathname);
+      return;
+    }
+
     socketManager.connect();
 
     const handleConnect: SocketCallback = () => {
@@ -300,7 +311,7 @@ export const useWebSocket = () => {
       socketManager.off('game-started');
       socketManager.off('error', handleError);
     };
-  }, []);
+  }, [isAdminPage, router]);
 
   const addNotification = useCallback((message: string, type: Notification['type'] = 'info') => {
     const notification: Notification = {

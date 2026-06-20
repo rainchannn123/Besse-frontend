@@ -69,9 +69,13 @@ export default function Page() {
     try {
       const identity = (data.email || data.name || '').trim();
 
+      // ✅ Try admin login first (admin username is 'admin')
       try {
+        console.log('🔐 Attempting admin login with:', identity);
         const adminResponse = await adminService.login(identity, data.password);
+        
         if (adminResponse.success) {
+          console.log('✅ Admin login successful!');
           addNotification({
             message: 'Admin monitor access granted',
             type: 'success',
@@ -79,19 +83,30 @@ export default function Page() {
           router.push('/admin');
           return;
         }
-      } catch {
-        // Fall through to standard player login.
+      } catch (adminError: any) {
+        // If it's a 400, the user is not admin - continue to regular login
+        if (adminError.response?.status === 400) {
+          console.log('Not admin, trying regular login...');
+        } else {
+          console.log('Admin login failed:', adminError.message);
+        }
+        // Fall through to standard player login
       }
 
+      // ✅ Regular user login
+      console.log('👤 Attempting regular login with:', identity);
       await login({
         email: identity,
         password: data.password,
       });
+      
+      console.log('✅ Regular login successful!');
 
     } catch (error: any) {
-      console.error('Login error:', error);
+      console.error('❌ Login error:', error);
 
       let errorMessage = 'Login failed. Please try again.';
+      
       if (error.response?.status === 401) {
         errorMessage = 'Invalid email or password';
       } else if (error.response?.status === 400) {
@@ -102,6 +117,8 @@ export default function Page() {
         errorMessage = 'Network error. Please check your connection.';
       } else if (error.message === 'Invalid credentials') {
         errorMessage = 'Invalid email or password';
+      } else if (error.message.includes('email')) {
+        errorMessage = 'Invalid email address';
       } else {
         errorMessage = error.response?.data?.message || errorMessage;
       }
@@ -120,9 +137,9 @@ export default function Page() {
       <div className="container mx-auto h-full">
         <main className={`flex items-center justify-center lg:p-0 p-4 h-full`}>
           <div>
-            <WelcomeBesse></WelcomeBesse>
+            <WelcomeBesse />
             <div
-              className="bg-cover bg-center pt-14  xl:w-[1289px]  lg:w-[1000px]  md:w-[800px]  sm:w-[600px] w-full  mx-auto rounded-[20px] sm:px-0 px-8 sm:mx-0 "
+              className="bg-cover bg-center pt-14 xl:w-[1289px] lg:w-[1000px] md:w-[800px] sm:w-[600px] w-full mx-auto rounded-[20px] sm:px-0 px-8 sm:mx-0"
               style={{
                 backgroundImage: `url(${woodenBg.src})`,
               }}
@@ -135,6 +152,7 @@ export default function Page() {
                         name="name"
                         control={control}
                         label="Email"
+                        placeholder="Enter your email or username"
                       />
                     </div>
 
@@ -145,20 +163,22 @@ export default function Page() {
                           control={control}
                           label="Password"
                           type="password"
+                          placeholder="Enter your password"
                         />
                       </div>
                     </div>
+                    
                     <div className="flex items-center">
                       <input
                         id="agreeTerms"
                         type="checkbox"
                         checked={agreeTerms}
                         onChange={(e) => setAgreeTerms(e.target.checked)}
-                        className="h-5 w-5 pb-[18px] text-sm border-2  border-[#33552C] bg-transparent rounded-none focus:ring-2 focus:ring-[#33552C] appearance-none  checked:bg-[#33552C] checked:border-[#33552C]  checked:after:content-['✔'] checked:after:text-white checked:after:block68 checked:after:text-center"
+                        className="h-5 w-5 pb-[18px] text-sm border-2 border-[#33552C] bg-transparent rounded-none focus:ring-2 focus:ring-[#33552C] appearance-none checked:bg-[#33552C] checked:border-[#33552C] checked:after:content-['✔'] checked:after:text-white checked:after:block checked:after:text-center"
                       />
                       <label
                         htmlFor="agreeTerms"
-                        className="ml-2 block md:text-[20px] text-[13px] font-medium  greenTextColor"
+                        className="ml-2 block md:text-[20px] text-[13px] font-medium greenTextColor"
                       >
                         I agree to the Terms and Conditions
                       </label>
@@ -167,7 +187,7 @@ export default function Page() {
                     <button
                       type="submit"
                       disabled={loading}
-                      className={`mt-16 w-full lg:w-[682px] py-3 flex justify-center items-center font-bold  px-4 border border-[#000000] shadow-md md:text-[30px] text-[24px]  text-white buttonColor focus:outline-none focus:ring-0 focus:ring-offset-0\ focus:ring-green-500 transition duration-150 ease-in-out ${
+                      className={`mt-16 w-full lg:w-[682px] py-3 flex justify-center items-center font-bold px-4 border border-[#000000] shadow-md md:text-[30px] text-[24px] text-white buttonColor focus:outline-none focus:ring-0 focus:ring-offset-0 focus:ring-green-500 transition duration-150 ease-in-out ${
                         loading ? 'opacity-70 cursor-not-allowed' : ''
                       }`}
                     >

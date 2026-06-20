@@ -18,6 +18,7 @@ const robotoMono = Roboto_Mono({
   weight: ['400', '500', '700'],
   variable: '--font-roboto-mono',
 });
+
 const poppins = Poppins({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700'],
@@ -32,8 +33,7 @@ const righteous = Righteous({
 
 export const metadata: Metadata = {
   title: 'Besse',
-  description:
-    'exciting game for sustainable waste management and recycling operations.',
+  description: 'exciting game for sustainable waste management and recycling operations.',
 };
 
 export default function RootLayout({
@@ -44,7 +44,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${robotoMono.variable} ${poppins.variable} ${righteous.variable} antialiased `}
+        className={`${geistSans.variable} ${geistMono.variable} ${robotoMono.variable} ${poppins.variable} ${righteous.variable} antialiased`}
       >
         {children}
         <ToastContainer />
