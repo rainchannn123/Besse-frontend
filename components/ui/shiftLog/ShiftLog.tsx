@@ -31,6 +31,9 @@ interface ShiftLogProps {
   totalCO2?: number;
   wasteInventory?: number;
   onStatusLog?: (log: LogItem) => void;
+  teamTimer?: string; // ✅ NEW: Team timer prop
+  isEliminated?: boolean; // ✅ NEW: Elimination status
+  teamStatus?: string; // ✅ NEW: Team status
 }
 
 const ShiftLog: React.FC<ShiftLogProps> = ({
@@ -44,6 +47,9 @@ const ShiftLog: React.FC<ShiftLogProps> = ({
   totalCO2,
   wasteInventory,
   onStatusLog,
+  teamTimer,
+  isEliminated,
+  teamStatus,
 }) => {
   const [currentTime, setCurrentTime] = useState<string>('');
   const currentDay = useGameDay(shiftStartTime);
@@ -74,8 +80,8 @@ const ShiftLog: React.FC<ShiftLogProps> = ({
       const stored = localStorage.getItem('init_state');
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (parsed?.constants?.REAL_TIME_GAME_DURATION_MINUTES) {
-          durationMinutes = parsed.constants.REAL_TIME_GAME_DURATION_MINUTES;
+        if (parsed?.constants?.TEAM_GAME_DURATION_MINUTES) {
+          durationMinutes = parsed.constants.TEAM_GAME_DURATION_MINUTES;
         }
       }
     } catch {}
@@ -117,11 +123,23 @@ const ShiftLog: React.FC<ShiftLogProps> = ({
         if (totalCO2Ref.current !== undefined) statusParts.push(`CO₂: ${totalCO2Ref.current.toFixed(1)}t`);
         if (wasteInventoryRef.current !== undefined) statusParts.push(`Waste: ${wasteInventoryRef.current.toFixed(1)}t`);
 
+        // ✅ Add team status if available
+        if (isEliminated !== undefined && isEliminated) {
+          statusParts.push(`💀 ELIMINATED`);
+        } else if (teamStatus === 'completed') {
+          statusParts.push(`✅ COMPLETED`);
+        }
+
+        // ✅ Add timer if available
+        if (teamTimer) {
+          statusParts.push(`⏱️ ${teamTimer}`);
+        }
+
         if (statusParts.length > 0) {
           onStatusLog({
             time: getCountdownTimestamp(),
             message: `Status Update — ${statusParts.join(' | ')}`,
-            type: 'info',
+            type: isEliminated ? 'error' : 'info',
           });
         }
       }
@@ -132,7 +150,7 @@ const ShiftLog: React.FC<ShiftLogProps> = ({
 
     const interval = setInterval(checkAndEmitStatus, 10000);
     return () => clearInterval(interval);
-  }, [shiftStartTime, onStatusLog, getCountdownTimestamp]);
+  }, [shiftStartTime, onStatusLog, getCountdownTimestamp, isEliminated, teamStatus, teamTimer]);
 
   // Track if user has manually scrolled up
   useEffect(() => {
@@ -173,24 +191,57 @@ const ShiftLog: React.FC<ShiftLogProps> = ({
         ))}
       </div>
 
-      {/* Right: Time */}
+      {/* Right: Time & Status */}
       <div className="flex flex-col justify-center gap-1">
-        {/* 30-minute shift countdown - ALWAYS SHOW */}
-        <div className="bg-[#8b6647] px-2 rounded-[30px] flex items-center justify-center h-[50px] w-full col-span-1 gap-2">
-          <span className="font-bold xl:text-[22px] lg:text-[18px] md:text-[16px] text-[14px] text-white font-roboto pr-2">
-            Day {currentDay} -
-          </span>
-          {gameOverDisplay ? (
-            <span className="font-bold xl:text-[22px] lg:text-[18px] md:text-[16px] text-[14px] text-white font-roboto animate-pulse">
-              {gameOverDisplay}
-            </span>
-          ) : (
+        {/* ✅ Team Timer - ALWAYS SHOW with status */}
+        <div className={`bg-[#8b6647] px-2 rounded-[30px] flex items-center justify-between h-[50px] w-full col-span-1 gap-2 ${isEliminated ? 'border-2 border-red-500' : ''}`}>
+          <div className="flex items-center gap-2">
             <span className="font-bold xl:text-[22px] lg:text-[18px] md:text-[16px] text-[14px] text-white font-roboto">
-              {shiftCountdown}
+              {isEliminated ? '💀' : '⏱️'}
             </span>
-          )}
-          <div className="flex-shrink-0">
-            <Image src={clock} alt="clock" width={32} height={32} />
+            <span className="font-bold xl:text-[22px] lg:text-[18px] md:text-[16px] text-[14px] text-white font-roboto pr-2">
+              Day {currentDay} -
+            </span>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            {gameOverDisplay ? (
+              <span className="font-bold xl:text-[22px] lg:text-[18px] md:text-[16px] text-[14px] text-white font-roboto animate-pulse">
+                {gameOverDisplay}
+              </span>
+            ) : teamTimer ? (
+              <span className={`font-bold xl:text-[22px] lg:text-[18px] md:text-[16px] text-[14px] font-roboto ${
+                isEliminated ? 'text-red-400' :
+                parseInt(teamTimer) < 3 ? 'text-red-400 animate-pulse' : 'text-white'
+              }`}>
+                {teamTimer}
+              </span>
+            ) : (
+              <span className="font-bold xl:text-[22px] lg:text-[18px] md:text-[16px] text-[14px] text-white font-roboto">
+                {shiftCountdown}
+              </span>
+            )}
+            
+            {/* ✅ Status Badge */}
+            {isEliminated && (
+              <span className="bg-red-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                ELIMINATED
+              </span>
+            )}
+            {!isEliminated && teamStatus === 'completed' && (
+              <span className="bg-green-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                COMPLETED
+              </span>
+            )}
+            {!isEliminated && teamStatus === 'active' && (
+              <span className="bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                ACTIVE
+              </span>
+            )}
+            
+            <div className="flex-shrink-0">
+              <Image src={clock} alt="clock" width={32} height={32} />
+            </div>
           </div>
         </div>
       </div>
