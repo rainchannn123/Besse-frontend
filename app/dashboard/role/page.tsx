@@ -322,15 +322,15 @@ export default function RolePage() {
       scheduleLobbyRefresh();
     });
 
-    // ✅ NEW: Listen for continue-to-pairing event from backend
+    // ✅ Listen for continue-to-pairing event from backend - redirect to matchmaking lobby
     const unsubscribeContinueToPairing = subscribe('continue-to-pairing', (data: any) => {
       console.log('📢 Received continue-to-pairing event:', data);
       
       // Check if this event is for the current session
       if (data?.sessionId === userInfo?.currentSession) {
-        console.log('✅ Navigate to pairing page');
-        // Navigate to pairing page
-        router.push('/dashboard/pairing');
+        console.log('✅ Navigate to matchmaking lobby');
+        // Navigate to matchmaking lobby (NEW FLOW - waiting room removed)
+        router.push('/dashboard/matchmaking-lobby');
       }
     });
 
@@ -358,10 +358,10 @@ export default function RolePage() {
           } else if (role === 'municipality') {
             window.location.href = '/dashboard/municipality';
           } else {
-            window.location.href = '/dashboard/pairing';
+            window.location.href = '/dashboard/matchmaking-lobby';
           }
         } else {
-          window.location.href = '/dashboard/pairing';
+          window.location.href = '/dashboard/matchmaking-lobby';
         }
       }
     });
@@ -498,9 +498,10 @@ export default function RolePage() {
         sessionId: userInfo.currentSession,
       });
       
-      // The WebSocket will handle redirecting all players
-      // But for the leader, we can also redirect directly as a fallback
-      router.push('/dashboard/pairing');
+      // ✅ UPDATED: Redirect to matchmaking lobby (waiting room removed)
+      // The WebSocket will handle redirecting all players via continue-to-pairing event
+      // But for the leader, we also redirect directly as a fallback
+      router.push('/dashboard/matchmaking-lobby');
     } catch (err: any) {
       console.error('Continue to pairing error:', err);
       setError(err.response?.data?.message || 'Failed to continue. Please try again.');
@@ -703,7 +704,7 @@ export default function RolePage() {
                     ? "All players didn't select the roles yet"
                     : userInfo?._id !== leader
                     ? 'Only the lobby leader can continue'
-                    : 'Continue to pairing'
+                    : 'Continue to matchmaking'
                 }
                 className={`flex justify-center items-center gap-10 px-3 py-2 rounded-[5px] transition-colors duration-150 ${
                   canContinue

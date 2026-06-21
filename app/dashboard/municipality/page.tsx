@@ -17,7 +17,7 @@ import { gameService } from '@/services/gameService';
 import { municipalityService } from '@/services/municipalityService';
 import { useAuthStore } from '@/stores/authStore';
 import { useNotificationStore } from '@/stores/notificationStore';
-import { CityProject, GameState, Material, WasteBatch } from '@/types/besse';
+import { CityProject, GameState, Material, TeamData, WasteBatch } from '@/types/besse';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -37,6 +37,7 @@ export default function MunicipalityPage() {
     'waste-collection'
   );
   const [gameState, setGameState] = useState<GameState | null>(null);
+  const [myTeam, setMyTeam] = useState<TeamData | null>(null);
   const [wasteBatches, setWasteBatches] = useState<WasteBatch[]>([]);
   const [cityProjects, setCityProjects] = useState<CityProject[]>([]);
   const [selectedItem, setSelectedItem] = useState<WasteBatch | CityProject | Material | null>(
@@ -55,6 +56,8 @@ export default function MunicipalityPage() {
     typeof window !== 'undefined' ? localStorage.getItem('game_mode') : null
   );
   const [activeTransports, setActiveTransports] = useState<any[]>([]);
+  const [teamTimer, setTeamTimer] = useState<string>('15:00');
+  const [teamCount, setTeamCount] = useState<number>(0);
   const { getCurrentGameSession, notifications, isConnected, subscribe, joinGame, emit } = useWebSocket();
 
   const currentGameState = gameState;
@@ -70,6 +73,27 @@ export default function MunicipalityPage() {
       const response = await gameService.getGameState(user.currentSession);
       if (response.success && response.data) {
         setGameState(response.data.gameState);
+        
+        // ✅ Find current team
+        const currentTeam = response.data.gameState.teams?.find(
+          (team: TeamData) => team.sessionId === user.currentSession
+        );
+        if (currentTeam) {
+          setMyTeam(currentTeam);
+          setWasteBatches(
+            currentTeam.wasteBatches?.filter((batch: WasteBatch) => batch.status === 'PENDING') || []
+          );
+          setCityProjects(currentTeam.cityProjects || []);
+          if (currentTeam.activeTransports) {
+            setActiveTransports(currentTeam.activeTransports);
+          }
+        }
+        
+        // ✅ Get team count
+        if (response.data.gameState.teams) {
+          setTeamCount(response.data.gameState.teams.length);
+        }
+        
         if (
           response.data.gameState.gameStatus === 'won' ||
           response.data.gameState.gameStatus === 'lost' ||
@@ -121,6 +145,24 @@ export default function MunicipalityPage() {
     fetchCityProjects();
   }, []);
 
+  // ✅ Team timer countdown
+  useEffect(() => {
+    if (!myTeam) return;
+
+    const updateTimer = () => {
+      const now = Date.now();
+      const elapsed = (now - myTeam.teamStartTime) / 60000; // minutes
+      const remaining = Math.max(0, 15 - elapsed);
+      const mins = Math.floor(remaining);
+      const secs = Math.floor((remaining - mins) * 60);
+      setTeamTimer(`${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`);
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [myTeam]);
+
   const [liveLogItems, setLiveLogItems] = useState<
     {
       time: string;
@@ -158,19 +200,23 @@ export default function MunicipalityPage() {
   const authoritativeState = fullPayload?.gameState ?? currentGameState;
 
   useEffect(() => {
-    if (authoritativeState?.activeTransports) {
-      setActiveTransports(authoritativeState.activeTransports);
+    if (myTeam?.activeTransports) {
+      setActiveTransports(myTeam.activeTransports);
     }
-  }, [authoritativeState?.activeTransports]);
+  }, [myTeam?.activeTransports]);
 
   useEffect(() => {
     const unsubGameStateUpdate = subscribe('game-state-update', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
-
-        if (data.gameState.wasteBatches) {
+        
+        const currentTeam = data.gameState.teams?.find(
+          (team: TeamData) => team.sessionId === user?.currentSession
+        );
+        if (currentTeam) {
+          setMyTeam(currentTeam);
           setWasteBatches(
-            data.gameState.wasteBatches.filter((batch: WasteBatch) => batch.status === 'PENDING')
+            currentTeam.wasteBatches?.filter((batch: WasteBatch) => batch.status === 'PENDING') || []
           );
         }
 
@@ -187,11 +233,16 @@ export default function MunicipalityPage() {
     const unsubGameStateFull = subscribe('game-state-full', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
-
-        if (data.gameState.wasteBatches) {
+        
+        const currentTeam = data.gameState.teams?.find(
+          (team: TeamData) => team.sessionId === user?.currentSession
+        );
+        if (currentTeam) {
+          setMyTeam(currentTeam);
           setWasteBatches(
-            data.gameState.wasteBatches.filter((batch: WasteBatch) => batch.status === 'PENDING')
+            currentTeam.wasteBatches?.filter((batch: WasteBatch) => batch.status === 'PENDING') || []
           );
+          setCityProjects(currentTeam.cityProjects || []);
         }
 
         if (
@@ -214,10 +265,14 @@ export default function MunicipalityPage() {
     const unsubSystemCheckUpdate = subscribe('system-check-update', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
-
-        if (data.gameState.wasteBatches) {
+        
+        const currentTeam = data.gameState.teams?.find(
+          (team: TeamData) => team.sessionId === user?.currentSession
+        );
+        if (currentTeam) {
+          setMyTeam(currentTeam);
           setWasteBatches(
-            data.gameState.wasteBatches.filter((batch: WasteBatch) => batch.status === 'PENDING')
+            currentTeam.wasteBatches?.filter((batch: WasteBatch) => batch.status === 'PENDING') || []
           );
         }
       }
@@ -232,11 +287,15 @@ export default function MunicipalityPage() {
     const unsubGameActions = subscribe('game-state-updated', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
-
-        if (data.gameState.wasteBatches) {
-          const pendingBatches = data.gameState.wasteBatches.filter(
+        
+        const currentTeam = data.gameState.teams?.find(
+          (team: TeamData) => team.sessionId === user?.currentSession
+        );
+        if (currentTeam) {
+          setMyTeam(currentTeam);
+          const pendingBatches = currentTeam.wasteBatches?.filter(
             (batch: WasteBatch) => batch.status === 'PENDING'
-          );
+          ) || [];
           setWasteBatches(pendingBatches);
         }
       }
@@ -251,7 +310,7 @@ export default function MunicipalityPage() {
     const unsubCountdownExpired = subscribe('countdown-expired', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
-
+        
         if (
           data.gameState.gameStatus === 'won' ||
           data.gameState.gameStatus === 'lost' ||
@@ -304,8 +363,11 @@ export default function MunicipalityPage() {
     const unsubTransportStarted = subscribe('transport-started', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
-        if (data.gameState.activeTransports) {
-          setActiveTransports(data.gameState.activeTransports);
+        const currentTeam = data.gameState.teams?.find(
+          (team: TeamData) => team.sessionId === user?.currentSession
+        );
+        if (currentTeam?.activeTransports) {
+          setActiveTransports(currentTeam.activeTransports);
         }
       }
       addNotification({
@@ -317,8 +379,11 @@ export default function MunicipalityPage() {
     const unsubTransportCompleted = subscribe('transport-completed', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
-        if (data.gameState.activeTransports) {
-          setActiveTransports(data.gameState.activeTransports);
+        const currentTeam = data.gameState.teams?.find(
+          (team: TeamData) => team.sessionId === user?.currentSession
+        );
+        if (currentTeam?.activeTransports) {
+          setActiveTransports(currentTeam.activeTransports);
         }
       }
       addNotification({
@@ -329,8 +394,9 @@ export default function MunicipalityPage() {
     });
 
     const unsubSurrenderUpdate = subscribe('surrender-update', (data: any) => {
-      if (data?.surrenderVotes && gameState) {
-        setGameState((prev) => prev ? { ...prev, surrenderVotes: data.surrenderVotes } : prev);
+      if (data?.surrenderVotes && myTeam) {
+        const updatedTeam = { ...myTeam, surrenderVotes: data.surrenderVotes };
+        setMyTeam(updatedTeam);
       }
     });
 
@@ -351,22 +417,22 @@ export default function MunicipalityPage() {
       unsubTransportCompleted && unsubTransportCompleted();
       unsubSurrenderUpdate && unsubSurrenderUpdate();
     };
-  }, [subscribe, router, fetchWasteBatches, fetchCityProjects, addNotification]);
+  }, [subscribe, router, fetchWasteBatches, fetchCityProjects, addNotification, myTeam]);
 
   const getDurationMinutes = () => {
     const c = currentGameState?.constants as any;
-    if (c?.REAL_TIME_GAME_DURATION_MINUTES) return c.REAL_TIME_GAME_DURATION_MINUTES;
+    if (c?.TEAM_GAME_DURATION_MINUTES) return c.TEAM_GAME_DURATION_MINUTES;
     try {
       const stored = localStorage.getItem('init_state');
-      if (stored) { const p = JSON.parse(stored); if (p?.constants?.REAL_TIME_GAME_DURATION_MINUTES) return p.constants.REAL_TIME_GAME_DURATION_MINUTES; }
+      if (stored) { const p = JSON.parse(stored); if (p?.constants?.TEAM_GAME_DURATION_MINUTES) return p.constants.TEAM_GAME_DURATION_MINUTES; }
     } catch {}
     return 15;
   };
   const totalDurMin = getDurationMinutes();
   const staticLogData: { time: string; message: string }[] = [];
 
-  const selectableMaterials = authoritativeState?.municipalInventory
-    ? Object.entries(authoritativeState.municipalInventory)
+  const selectableMaterials = myTeam?.municipalInventory
+    ? Object.entries(myTeam.municipalInventory)
         .filter(([_, amount]) => (amount as number) >= 0.01)
         .map(([type, mass]) => ({
           id: type,
@@ -406,7 +472,7 @@ export default function MunicipalityPage() {
       const stored = localStorage.getItem('init_state');
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (parsed?.constants?.REAL_TIME_GAME_DURATION_MINUTES) durationMin = parsed.constants.REAL_TIME_GAME_DURATION_MINUTES;
+        if (parsed?.constants?.TEAM_GAME_DURATION_MINUTES) durationMin = parsed.constants.TEAM_GAME_DURATION_MINUTES;
       }
     } catch {}
     const remainingMs = Math.max(0, durationMin * 60 * 1000 - elapsed);
@@ -446,14 +512,7 @@ export default function MunicipalityPage() {
   }
 
   const handleCollectWasteWithTransport = async (mode: 'fast' | 'slow') => {
-    console.log('=== handleCollectWasteWithTransport CALLED ===');
-    console.log('mode:', mode);
-    console.log('user:', user);
-    console.log('currentSession:', user?.currentSession);
-    console.log('selectedItem:', selectedItem);
-    
     if (!user?.currentSession || !selectedItem || !('status' in selectedItem)) {
-      console.log('FAILED: No active session or no batch selected');
       addNotification({
         message: 'No active session or no batch selected',
         type: 'error',
@@ -461,10 +520,7 @@ export default function MunicipalityPage() {
       return;
     }
 
-    console.log('selectedItem.status:', selectedItem.status);
-    
     if (selectedItem.status !== 'PENDING') {
-      console.log('FAILED: Batch status is not PENDING');
       addNotification({
         message: `Batch is already ${selectedItem.status}`,
         type: 'error',
@@ -474,14 +530,9 @@ export default function MunicipalityPage() {
 
     const mass = (selectedItem as WasteBatch).mass;
     const cost = mode === 'fast' ? mass * 50 : mass * 25;
-    const currentBudget = authoritativeState?.budget ?? 0;
-
-    console.log('mass:', mass);
-    console.log('cost:', cost);
-    console.log('currentBudget:', currentBudget);
+    const currentBudget = myTeam?.budget ?? 0;
 
     if (currentBudget < cost) {
-      console.log('FAILED: Insufficient budget');
       addNotification({
         message: `Insufficient budget. ${mode} transport costs $${cost.toFixed(2)} but your budget is $${currentBudget.toFixed(2)}.`,
         type: 'error',
@@ -489,13 +540,14 @@ export default function MunicipalityPage() {
       return;
     }
 
-    console.log('Making API call to:', `/municipality/collect-waste-transport/${user.currentSession}`);
-    console.log('Request body:', {
-      batchId: selectedItem.id,
-      sessionId: user.currentSession,
-      mode: mode,
-    });
-    
+    if (myTeam?.isEliminated) {
+      addNotification({
+        message: 'Your team has been eliminated. Cannot perform actions.',
+        type: 'error',
+      });
+      return;
+    }
+
     try {
       const response = await municipalityService.collectWasteWithTransport(
         user.currentSession,
@@ -505,8 +557,6 @@ export default function MunicipalityPage() {
           mode: mode,
         }
       );
-      
-      console.log('API response:', response);
       
       if (response.success) {
         addNotification({
@@ -524,7 +574,6 @@ export default function MunicipalityPage() {
       }
     } catch (err: any) {
       console.error('API error:', err);
-      console.error('Error response:', err?.response);
       addNotification({
         message: err?.response?.data?.message || err?.message || 'Failed to start transport',
         type: 'error',
@@ -540,6 +589,14 @@ export default function MunicipalityPage() {
     if (!user?.currentSession) {
       addNotification({
         message: 'No active session',
+        type: 'error',
+      });
+      return;
+    }
+
+    if (myTeam?.isEliminated) {
+      addNotification({
+        message: 'Your team has been eliminated. Cannot perform actions.',
         type: 'error',
       });
       return;
@@ -578,11 +635,18 @@ export default function MunicipalityPage() {
 
   const handleSurrenderToggle = () => {
     if (!user?.currentSession) return;
+    if (myTeam?.isEliminated) {
+      addNotification({
+        message: 'Your team has been eliminated. Cannot surrender.',
+        type: 'error',
+      });
+      return;
+    }
     emit('surrender-toggle', { sessionId: user.currentSession });
   };
 
-  const surrenderVotes = authoritativeState?.surrenderVotes ?? [];
-  const canSurrender = (authoritativeState?.minutesElapsed ?? 0) >= 15;
+  const surrenderVotes = myTeam?.surrenderVotes ?? [];
+  const canSurrender = (myTeam?.minutesElapsed ?? 0) >= 15;
 
   return (
     <div className="bg-[#f3e9da] min-h-screen flex flex-col pb-6 lg:pb-8">
@@ -590,80 +654,82 @@ export default function MunicipalityPage() {
                   
           <TransportProgressList transports={activeTransports} />
           
-        <div className="flex-shrink-0">
-          <ShiftLog
-            logs={logData}
-            shiftStart={shiftStart}
-            shiftStartTime={authoritativeState?.gameStartTime}
-            gameOverCountdown={authoritativeState?.gameOverCountdown}
-            onGameOver={() => router.push('/dashboard/game-over')}
-            cityHealth={authoritativeState?.cityHealth}
-            budget={authoritativeState?.budget}
-            totalCO2={authoritativeState?.totalCO2}
-            wasteInventory={authoritativeState?.wasteInventory}
-            onStatusLog={handleStatusLog}
-          />
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
-          <div className="xl:col-span-3 lg:col-span-2 col-span-1 flex flex-col">
-            <div
-              className="bg-cover bg-center mx-auto rounded-[20px] flex flex-col lg:min-h-0 lg:max-h-[calc(100vh-21rem)] hoverflow-hidden w-full flex-1"
-              style={{ backgroundImage: `url(${woodenBg.src})` }}
-            >
-              <MunicipalityCustomHeader
-                backgroundImage={woodenHead.src}
-                title={authoritativeState?.teamRole || currentGameState?.teamRole}
-              />
-              {/* <GameModeBadge gameMode={gameMode} /> */}
-
-              <div className="flex justify-center mb-1 flex-shrink-0">
-                <div className="bg-white rounded-lg p-1 shadow-md">
-                  <button
-                    onClick={() => {
-                      setActiveTab('waste-collection');
-                      setSelectedItem(null);
-                      setSelectedMaterial(null);
-                      setSelectedProject(null);
-                    }}
-                    className={`px-4 py-1 rounded-md text-sm font-semibold transition-colors ${
-                      activeTab === 'waste-collection'
-                        ? 'bg-[#3A7D2C] text-white'
-                        : 'text-gray-600 hover:bg-gray-100'
-                    }`}
-                  >
-                    Waste Collection
-                  </button>
-                  <button
-                    onClick={() => {
-                      setActiveTab('city-projects');
-                      setSelectedItem(null);
-                      setSelectedMaterial(null);
-                      setSelectedProject(null);
-                    }}
-                    className={`px-4 py-1 rounded-md text-sm font-semibold transition-colors ${
-                      activeTab === 'city-projects'
-                        ? 'bg-[#3A7D2C] text-white'
-                        : 'text-gray-600 hover:bg-gray-100'
-                    }`}
-                  >
-                    Inventory
-                  </button>
-                  <button
-                    onClick={() => {
-                      setActiveTab('project-details');
-                      setSelectedItem(null);
-                      setSelectedMaterial(null);
-                      setSelectedProject(null);
-                    }}
-                    className={`px-4 py-1 rounded-md text-sm font-semibold transition-colors ${
-                      activeTab === 'project-details'
-                        ? 'bg-[#3A7D2C] text-white'
-                        : 'text-gray-600 hover:bg-gray-100'
-                    }`}
-                  >
-                    Project Details
-                  </button>
+          <div className="flex-shrink-0">
+            <ShiftLog
+              logs={logData}
+              shiftStart={shiftStart}
+              shiftStartTime={authoritativeState?.gameStartTime}
+              gameOverCountdown={authoritativeState?.gameOverCountdown}
+              onGameOver={() => router.push('/dashboard/game-over')}
+              cityHealth={myTeam?.cityHealth}
+              budget={myTeam?.budget}
+              totalCO2={myTeam?.totalCO2}
+              wasteInventory={myTeam?.wasteInventory}
+              onStatusLog={handleStatusLog}
+            />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 flex-1 lg:min-h-0 lg:overflow-hidden">
+            <div className="xl:col-span-3 lg:col-span-2 col-span-1 flex flex-col lg:min-h-0 lg:overflow-hidden">
+              <div
+                className="bg-cover bg-center mx-auto rounded-[20px] flex flex-col lg:min-h-0 overflow-hidden w-full flex-1"
+                style={{ backgroundImage: `url(${woodenBg.src})` }}
+              >
+                <MunicipalityCustomHeader
+                  backgroundImage={woodenHead.src}
+                  title={`${myTeam?.teamName || 'Your City'} (${myTeam?.citySlot || '?'}) | ${teamCount} Teams`}
+                />
+                <GameModeBadge gameMode={gameMode} />
+                
+                {/* ✅ Team Timer Display
+                <div className="flex justify-center my-1 flex-shrink-0">
+                  <div className="bg-white rounded-lg px-4 py-1 shadow-md border border-[#A99065]">
+                    <span className="font-bold text-[#33552C]">
+                      ⏱️ Time Remaining: 
+                      <span className={`ml-2 ${parseInt(teamTimer) < 3 ? 'text-red-600 animate-pulse' : 'text-[#50704C]'}`}>
+                        {teamTimer}
+                      </span>
+                    </span>
+                    {myTeam?.isEliminated && (
+                      <span className="ml-4 text-red-600 font-bold">💀 ELIMINATED</span>
+                    )}
+                    {myTeam?.gameStatus === 'completed' && (
+                      <span className="ml-4 text-green-600 font-bold">✅ COMPLETED</span>
+                    )}
+                  </div>
+                </div> */}
+                
+                <div className="flex justify-center mb-1 flex-shrink-0">
+                  <div className="bg-white rounded-lg p-1 shadow-md">
+                    <button
+                      onClick={() => {
+                        setActiveTab('waste-collection');
+                        setSelectedItem(null);
+                        setSelectedMaterial(null);
+                        setSelectedProject(null);
+                      }}
+                      className={`px-4 py-1 rounded-md text-sm font-semibold transition-colors ${
+                        activeTab === 'waste-collection'
+                          ? 'bg-[#3A7D2C] text-white'
+                          : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      Waste Collection
+                    </button>
+                    <button
+                      onClick={() => {
+                        setActiveTab('city-projects');
+                        setSelectedItem(null);
+                        setSelectedMaterial(null);
+                        setSelectedProject(null);
+                      }}
+                      className={`px-4 py-1 rounded-md text-sm font-semibold transition-colors ${
+                        activeTab === 'city-projects'
+                          ? 'bg-[#3A7D2C] text-white'
+                          : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      Inventory
+                    </button>
                 </div>
               </div>
 
@@ -787,50 +853,44 @@ export default function MunicipalityPage() {
                 )}
               </div>
             </div>
-          </div>
-
-          <div className="xl:col-span-1 lg:col-span-2 col-span-1 lg:max-h-[calc(100vh-21rem)] lg:overflow-y-auto lg:pr-1">
-            {activeTab === 'waste-collection' ? (
-              selectedItem && 'status' in selectedItem ? (
-                <WasteCollectAction
-                  budget={authoritativeState?.budget ?? currentGameState?.budget}
-                  totalCO2={authoritativeState?.totalCO2 ?? (currentGameState?.totalCO2 || 0)}
-                  wasteInventory={
-                    authoritativeState?.wasteInventory ?? currentGameState?.wasteInventory
+            <div className="xl:col-span-1 lg:col-span-2 col-span-1 lg:overflow-y-auto lg:min-h-0">
+              {activeTab === 'waste-collection' ? (
+                selectedItem && 'status' in selectedItem ? (
+                  <WasteCollectAction
+                    budget={myTeam?.budget ?? 0}
+                    totalCO2={myTeam?.totalCO2 ?? 0}
+                    wasteInventory={myTeam?.wasteInventory ?? 0}
+                    maxCapacity={150}
+                    selectedBatch={selectedItem}
+                    handleCollectWaste={handleCollectWasteWithTransport}
+                    transportCostPerTon={
+                      (currentGameState?.constants?.FIXED_DISTANCE_TO_MRF_KM ?? 10) *
+                      (currentGameState?.constants?.TRANSPORT_COST_PER_TON_KM ?? 2.5)
+                    }
+                  />
+                ) : null
+              ) : selectedMaterial ? (
+                <MaterialConstructAction
+                  selectedMaterial={selectedMaterial}
+                  cityProjects={cityProjects}
+                  selectedProject={selectedProject}
+                  setSelectedProject={setSelectedProject}
+                  municipalInventory={
+                    myTeam?.municipalInventory ?? {
+                      paper: 0,
+                      plastic: 0,
+                      metal: 0,
+                      glass: 0,
+                      wood: 0,
+                    }
                   }
-                  maxCapacity={authoritativeState?.maxCapacity ?? currentGameState?.maxCapacity}
-                  selectedBatch={selectedItem}
-                  handleCollectWaste={handleCollectWasteWithTransport}
-                  transportCostPerTon={
-                    (authoritativeState?.constants?.FIXED_DISTANCE_TO_MRF_KM ?? 10) *
-                    (authoritativeState?.constants?.TRANSPORT_COST_PER_TON_KM ?? 2.5)
-                  }
+                  handleConstructProject={handleConstructProject}
                 />
-              ) : null
-            ) : selectedMaterial ? (
-              <MaterialConstructAction
-                selectedMaterial={selectedMaterial}
-                cityProjects={cityProjects}
-                selectedProject={selectedProject}
-                setSelectedProject={setSelectedProject}
-                municipalInventory={
-                  authoritativeState?.municipalInventory ?? currentGameState?.municipalInventory
-                }
-                handleConstructProject={handleConstructProject}
-              />
-            ) : null}
+              ) : null}
+            </div>
           </div>
         </div>
-
-        {/* <SurrenderButton
-          playerId={user?._id ?? ''}
-          surrenderVotes={surrenderVotes}
-          canSurrender={canSurrender}
-          onToggle={handleSurrenderToggle}
-        /> */}
       </div>
-
-      <GameChatbot pageContext="municipality" />
-    </div>
+      </div>
   );
 }

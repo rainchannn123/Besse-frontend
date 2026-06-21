@@ -3,6 +3,7 @@
 import CustomInput from '@/customHooks/component/customInput/CustomInput';
 import { WelcomeBesse } from '@/customHooks/component/welcomeBesse/WelcomeBesse';
 import loginBackground from '@/public/assets/images/login-background.png';
+import woodenBg from '@/public/assets/images/wooden_bg.png';
 import { adminService } from '@/services/adminService';
 import { lobbyService } from '@/services/lobbyService';
 import { useAuthStore } from '@/stores/authStore';
@@ -71,8 +72,11 @@ export default function Page() {
     try {
       const identity = (data.email || data.name || '').trim();
 
+      // ✅ Try admin login first (admin username is 'admin')
       try {
+        console.log('🔐 Attempting admin login with:', identity);
         const adminResponse = await adminService.login(identity, data.password);
+        
         if (adminResponse.success) {
           // addNotification({
           //   message: 'Admin monitor access granted',
@@ -81,19 +85,30 @@ export default function Page() {
           router.push('/admin');
           return;
         }
-      } catch {
-        // Fall through to standard player login.
+      } catch (adminError: any) {
+        // If it's a 400, the user is not admin - continue to regular login
+        if (adminError.response?.status === 400) {
+          console.log('Not admin, trying regular login...');
+        } else {
+          console.log('Admin login failed:', adminError.message);
+        }
+        // Fall through to standard player login
       }
 
+      // ✅ Regular user login
+      console.log('👤 Attempting regular login with:', identity);
       await login({
         email: identity,
         password: data.password,
       });
+      
+      console.log('✅ Regular login successful!');
 
     } catch (error: any) {
-      console.error('Login error:', error);
+      console.error('❌ Login error:', error);
 
       let errorMessage = 'Login failed. Please try again.';
+      
       if (error.response?.status === 401) {
         errorMessage = 'Invalid email or password';
       } else if (error.response?.status === 400) {
@@ -104,6 +119,8 @@ export default function Page() {
         errorMessage = 'Network error. Please check your connection.';
       } else if (error.message === 'Invalid credentials') {
         errorMessage = 'Invalid email or password';
+      } else if (error.message.includes('email')) {
+        errorMessage = 'Invalid email address';
       } else {
         errorMessage = error.response?.data?.message || errorMessage;
       }
@@ -196,7 +213,7 @@ export default function Page() {
                   </form>
 
                   {/* Register link - HIDDEN with CSS but code remains intact */}
-                  <div className="mt-4 text-center mb-10 hidden">
+                  <div className="mt-4 text-center mb-10">
                     <span className="greenTextColor font-regular md:text-[20px] text-[16px]">
                       Don't have an account?
                     </span>
