@@ -4,7 +4,6 @@ import api from '../config/api';
 import { AuthState, LoginCredentials, RegisterCredentials, User } from '../types/auth';
 import { secureStorage } from '../utils/secureStorage';
 
-// Update the AuthResponse interface to match your API
 export interface ApiAuthResponse {
   success: boolean;
   message: string;
@@ -21,6 +20,7 @@ interface AuthStore extends AuthState {
   initializeAuth: () => void;
   setLoading: (loading: boolean) => void;
   updateUser: (user: User) => void;
+  clearSession: () => void;
 }
 
 export const useAuthStore = create<AuthStore>((set, get) => ({
@@ -33,17 +33,12 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     try {
       set({ isLoading: true });
 
-      // Use the correct response type
       const response = await api.post<ApiAuthResponse>('/auth/login', credentials);
-
-      // Extract data from the response structure
       const { user, token } = response.data.data;
 
-      // Store in secure storage
       secureStorage.setItem('auth_token', token);
       secureStorage.setItem('user_data', JSON.stringify(user));
 
-      // Update state
       set({
         user,
         token,
@@ -55,7 +50,6 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     } catch (error: any) {
       set({ isLoading: false });
 
-      // Throw error to be caught in component
       const backendErrors = error.response?.data?.errors;
       if (Array.isArray(backendErrors) && backendErrors.length > 0) {
         const firstError = backendErrors[0]?.message;
@@ -77,17 +71,11 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   register: async (credentials: RegisterCredentials) => {
     try {
       set({ isLoading: true });
-
-      // Use the correct response type
-      const response = await api.post<ApiAuthResponse>('/auth/register', credentials);
-      const { user, token } = response.data.data;
-
-      // set({ isLoading: false });
+      await api.post<ApiAuthResponse>('/auth/register', credentials);
       return Promise.resolve();
     } catch (error: any) {
       set({ isLoading: false });
 
-      // Throw error to be caught in component
       if (error.response?.data?.message) {
         throw new Error(error.response.data.message);
       } else if (error.message) {
@@ -99,11 +87,44 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   },
 
   logout: () => {
+    // ✅ Clear all storage items
     secureStorage.removeItem('auth_token');
     secureStorage.removeItem('user_data');
     secureStorage.removeItem('pairing_session_id');
     secureStorage.removeItem('current_game_session');
     secureStorage.removeItem('init_state');
+    
+    // ✅ Also clear from localStorage directly as fallback
+    try {
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('user_data');
+      localStorage.removeItem('pairing_session_id');
+      localStorage.removeItem('current_game_session');
+      localStorage.removeItem('init_state');
+    } catch {
+      // Ignore localStorage errors
+    }
+    
+    set({
+      user: null,
+      token: null,
+      isAuthenticated: false,
+      isLoading: false,
+    });
+  },
+
+  // ✅ New method to clear just the session
+  clearSession: () => {
+    secureStorage.removeItem('pairing_session_id');
+    secureStorage.removeItem('current_game_session');
+    secureStorage.removeItem('init_state');
+    try {
+      localStorage.removeItem('pairing_session_id');
+      localStorage.removeItem('current_game_session');
+      localStorage.removeItem('init_state');
+    } catch {
+      // Ignore localStorage errors
+    }
     set({
       user: null,
       token: null,
@@ -126,7 +147,6 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
           isLoading: false,
         });
       } catch (error) {
-        // Clear invalid data
         secureStorage.removeItem('auth_token');
         secureStorage.removeItem('user_data');
         set({
@@ -148,9 +168,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   },
 
   updateUser: (user: User) => {
-    // Update secure storage
     secureStorage.setItem('user_data', JSON.stringify(user));
-    // Update state
     set({ user });
   },
 }));

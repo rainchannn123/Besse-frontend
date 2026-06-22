@@ -13,7 +13,16 @@ export const authService = {
   },
 
   async getProfile(): Promise<ProfileResponse> {
-    const response = await api.get<ProfileResponse>('/auth/profile');
-    return response.data;
+    try {
+      const response = await api.get<ProfileResponse>('/auth/profile');
+      return response.data;
+    } catch (error: any) {
+      // ✅ If 401, clear token and rethrow
+      if (error.response?.status === 401) {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user_data');
+      }
+      throw error;
+    }
   },
 };

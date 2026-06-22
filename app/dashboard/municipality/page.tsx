@@ -8,7 +8,10 @@ import { MunicipalityWasteSelectedBox } from '@/components/ui/selectedBox/Munici
 import ShiftLog from '@/components/ui/shiftLog/ShiftLog';
 import { WasteCollectAction } from '@/components/ui/wasteCollectAction/WasteCollectAction';
 import { SurrenderButton } from '@/components/ui/surrenderButton/SurrenderButton';
+import TransportProgressList from '@/components/ui/TransportProgressList';
 import GameChatbot from '@/components/ui/chatbot/GameChatbot';
+import LiveTeamRankingToggle from '@/components/ui/LiveTeamRankingToggle';
+
 import { useWebSocket } from '@/hooks/useWebSocket';
 import woodenBg from '@/public/assets/images/wooden_bg.png';
 import woodenHead from '@/public/assets/images/woodenHead.png';
@@ -16,7 +19,7 @@ import { gameService } from '@/services/gameService';
 import { municipalityService } from '@/services/municipalityService';
 import { useAuthStore } from '@/stores/authStore';
 import { useNotificationStore } from '@/stores/notificationStore';
-import { CityProject, GameState, Material, WasteBatch } from '@/types/besse';
+import { CityProject, GameState, Material, TeamData, WasteBatch } from '@/types/besse';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -36,11 +39,14 @@ export default function MunicipalityPage() {
     'waste-collection'
   );
   const [gameState, setGameState] = useState<GameState | null>(null);
+  const [myTeam, setMyTeam] = useState<TeamData | null>(null);
   const [wasteBatches, setWasteBatches] = useState<WasteBatch[]>([]);
   const [cityProjects, setCityProjects] = useState<CityProject[]>([]);
-  const [selectedItem, setSelectedItem] = useState<WasteBatch | CityProject | Material | null>(
+    const [selectedItem, setSelectedItem] = useState<WasteBatch | CityProject | Material | null>(
     null
   );
+  const [selectedBatch, setSelectedBatch] = useState<WasteBatch | null>(null);
+  const [selectedWasteBatchId, setSelectedWasteBatchId] = useState<string | null>(null);
   const [selectedMaterial, setSelectedMaterial] = useState<string | null>(null);
   const [selectedProject, setSelectedProject] = useState<CityProject | null>(null);
   const [loading, setLoading] = useState(true);
@@ -53,9 +59,28 @@ export default function MunicipalityPage() {
   const [gameMode] = useState<string | null>(() =>
     typeof window !== 'undefined' ? localStorage.getItem('game_mode') : null
   );
+  const [activeTransports, setActiveTransports] = useState<any[]>([]);
+  const [teamTimer, setTeamTimer] = useState<string>('15:00');
+  const [teamCount, setTeamCount] = useState<number>(0);
   const { getCurrentGameSession, notifications, isConnected, subscribe, joinGame, emit } = useWebSocket();
 
   const currentGameState = gameState;
+
+  const syncMyTeamFromGameState = useCallback((gs: GameState | null) => {
+    if (!gs || !user?.currentSession) return;
+    const currentTeam = gs.teams?.find((team: TeamData) => team.sessionId === user.currentSession);
+    if (!currentTeam) return;
+
+    setMyTeam(currentTeam);
+    setWasteBatches(
+      currentTeam.wasteBatches?.filter((batch: WasteBatch) => batch.status === 'PENDING') || []
+    );
+    setCityProjects(currentTeam.cityProjects || []);
+    if (currentTeam.activeTransports) {
+      setActiveTransports(currentTeam.activeTransports);
+    }
+  }, [user?.currentSession]);
+  
   const fetchGameState = async () => {
     if (!user?.currentSession) {
       setError('No active session found');
@@ -67,6 +92,27 @@ export default function MunicipalityPage() {
       const response = await gameService.getGameState(user.currentSession);
       if (response.success && response.data) {
         setGameState(response.data.gameState);
+        
+        // ✅ Find current team
+        const currentTeam = response.data.gameState.teams?.find(
+          (team: TeamData) => team.sessionId === user.currentSession
+        );
+        if (currentTeam) {
+          setMyTeam(currentTeam);
+          setWasteBatches(
+            currentTeam.wasteBatches?.filter((batch: WasteBatch) => batch.status === 'PENDING') || []
+          );
+          setCityProjects(currentTeam.cityProjects || []);
+          if (currentTeam.activeTransports) {
+            setActiveTransports(currentTeam.activeTransports);
+          }
+        }
+        
+        // ✅ Get team count
+        if (response.data.gameState.teams) {
+          setTeamCount(response.data.gameState.teams.length);
+        }
+        
         if (
           response.data.gameState.gameStatus === 'won' ||
           response.data.gameState.gameStatus === 'lost' ||
@@ -74,7 +120,6 @@ export default function MunicipalityPage() {
         ) {
           router.push('/dashboard/game-over');
         }
-        // Store init_state and current_game_session in localStorage
         localStorage.setItem('init_state', JSON.stringify(response.data.gameState));
         localStorage.setItem('current_game_session', response.data.gameState.sessionId);
       } else {
@@ -87,7 +132,7 @@ export default function MunicipalityPage() {
     }
   };
 
-  const fetchWasteBatches = async () => {
+    const fetchWasteBatches = useCallback(async () => {
     if (!user?.currentSession) return;
     try {
       const response = await municipalityService.getWasteBatches(user.currentSession);
@@ -99,9 +144,9 @@ export default function MunicipalityPage() {
     } catch (err: any) {
       console.error('Failed to fetch waste batches', err);
     }
-  };
+  }, [user?.currentSession]);
 
-  const fetchCityProjects = async () => {
+    const fetchCityProjects = useCallback(async () => {
     if (!user?.currentSession) return;
     try {
       const response = await municipalityService.getCityProjects(user.currentSession);
@@ -111,7 +156,7 @@ export default function MunicipalityPage() {
     } catch (err: any) {
       console.error('Failed to fetch city projects', err);
     }
-  };
+  }, [user?.currentSession]);
 
   useEffect(() => {
     fetchGameState();
@@ -119,7 +164,24 @@ export default function MunicipalityPage() {
     fetchCityProjects();
   }, []);
 
-  // Live log items from websocket events (system messages, player actions)
+  // ✅ Team timer countdown
+  useEffect(() => {
+    if (!myTeam) return;
+
+    const updateTimer = () => {
+      const now = Date.now();
+      const elapsed = (now - myTeam.teamStartTime) / 60000; // minutes
+      const remaining = Math.max(0, 15 - elapsed);
+      const mins = Math.floor(remaining);
+      const secs = Math.floor((remaining - mins) * 60);
+      setTeamTimer(`${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`);
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [myTeam]);
+
   const [liveLogItems, setLiveLogItems] = useState<
     {
       time: string;
@@ -128,23 +190,13 @@ export default function MunicipalityPage() {
       type?: 'info' | 'warning' | 'error';
     }[]
   >([]);
-  // throttle helper refs for applying full state
   const lastAppliedRef = useRef<number>(0);
   const pendingPayloadRef = useRef<any | null>(null);
   const shiftStartTimeRef = useRef<number>(0);
 
-  // Join the user's current session when websocket connects
   useEffect(() => {
     if (user?.currentSession && isConnected) {
-      // console.log('Municipality page: Calling joinGame with sessionId:', user.currentSession);
       joinGame(user.currentSession);
-    } else {
-      // console.log(
-      //   'Municipality page: Not joining yet - user.currentSession:',
-      //   user?.currentSession,
-      //   'isConnected:',
-      //   isConnected
-      // );
     }
   }, [user?.currentSession, isConnected, joinGame]);
 
@@ -164,21 +216,46 @@ export default function MunicipalityPage() {
     return () => window.clearTimeout(timer);
   }, [user?.currentSession]);
 
-  // Subscribe to realtime events
+  // One-time per-session auto reload fallback to stabilize initial realtime setup
   useEffect(() => {
-    // Game state updates
+    const sessionId = user?.currentSession;
+    if (!sessionId) return;
+
+    const key = `role_page_reload_once_${sessionId}_municipality`;
+    if (sessionStorage.getItem(key) === '1') return;
+
+    sessionStorage.setItem(key, '1');
+    const timer = window.setTimeout(() => {
+      window.location.reload();
+    }, 300);
+
+    return () => window.clearTimeout(timer);
+  }, [user?.currentSession]);
+
+  const authoritativeState = fullPayload?.gameState ?? currentGameState;
+
+  useEffect(() => {
+    if (myTeam?.activeTransports) {
+      setActiveTransports(myTeam.activeTransports);
+    }
+  }, [myTeam?.activeTransports]);
+
+  useEffect(() => {
     const unsubGameStateUpdate = subscribe('game-state-update', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
-
-        // Update waste batches directly from gameState for real-time updates
-        if (data.gameState.wasteBatches) {
+        syncMyTeamFromGameState(data.gameState);
+        
+        const currentTeam = data.gameState.teams?.find(
+          (team: TeamData) => team.sessionId === user?.currentSession
+        );
+        if (currentTeam) {
+          setMyTeam(currentTeam);
           setWasteBatches(
-            data.gameState.wasteBatches.filter((batch: WasteBatch) => batch.status === 'PENDING')
+            currentTeam.wasteBatches?.filter((batch: WasteBatch) => batch.status === 'PENDING') || []
           );
         }
 
-        // Check if game is over
         if (
           data.gameState.gameStatus === 'won' ||
           data.gameState.gameStatus === 'lost' ||
@@ -189,19 +266,22 @@ export default function MunicipalityPage() {
       }
     });
 
-    // Full game state with computed extras (authoritative source)
     const unsubGameStateFull = subscribe('game-state-full', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
-
-        // Update waste batches directly from gameState for real-time updates
-        if (data.gameState.wasteBatches) {
+        syncMyTeamFromGameState(data.gameState);
+        
+        const currentTeam = data.gameState.teams?.find(
+          (team: TeamData) => team.sessionId === user?.currentSession
+        );
+        if (currentTeam) {
+          setMyTeam(currentTeam);
           setWasteBatches(
-            data.gameState.wasteBatches.filter((batch: WasteBatch) => batch.status === 'PENDING')
+            currentTeam.wasteBatches?.filter((batch: WasteBatch) => batch.status === 'PENDING') || []
           );
+          setCityProjects(currentTeam.cityProjects || []);
         }
 
-        // Check if game is over
         if (
           data.gameState.gameStatus === 'won' ||
           data.gameState.gameStatus === 'lost' ||
@@ -211,7 +291,6 @@ export default function MunicipalityPage() {
         }
       }
       if (data?.realtimeUpdate) {
-        // Handle realtime update data if needed
       }
       if (data?.turnSummary) setTurnSummary(data.turnSummary);
       if (data?.statistics) setStatistics(data.statistics);
@@ -220,67 +299,62 @@ export default function MunicipalityPage() {
       setLastActionType(data?.actionType || null);
     });
 
-    // System check updates (30s interval)
     const unsubSystemCheckUpdate = subscribe('system-check-update', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
-
-        // Update waste batches directly from gameState for real-time updates
-        if (data.gameState.wasteBatches) {
+        syncMyTeamFromGameState(data.gameState);
+        
+        const currentTeam = data.gameState.teams?.find(
+          (team: TeamData) => team.sessionId === user?.currentSession
+        );
+        if (currentTeam) {
+          setMyTeam(currentTeam);
           setWasteBatches(
-            data.gameState.wasteBatches.filter((batch: WasteBatch) => batch.status === 'PENDING')
+            currentTeam.wasteBatches?.filter((batch: WasteBatch) => batch.status === 'PENDING') || []
           );
         }
       }
     });
 
-    // Turn ended
     const unsubTurnEnded = subscribe('turn-ended', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
+        syncMyTeamFromGameState(data.gameState);
       }
     });
 
-    // Handle all game actions via game-state-updated event with actionType
     const unsubGameActions = subscribe('game-state-updated', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
-
-        // Update waste batches directly from gameState for real-time updates
-        if (data.gameState.wasteBatches) {
-          const pendingBatches = data.gameState.wasteBatches.filter(
+        syncMyTeamFromGameState(data.gameState);
+        
+        const currentTeam = data.gameState.teams?.find(
+          (team: TeamData) => team.sessionId === user?.currentSession
+        );
+        if (currentTeam) {
+          setMyTeam(currentTeam);
+          const pendingBatches = currentTeam.wasteBatches?.filter(
             (batch: WasteBatch) => batch.status === 'PENDING'
-          );
-          // console.log('[Municipality] Updating waste batches from real-time event:', {
-          //   total: data.gameState.wasteBatches.length,
-          //   pending: pendingBatches.length,
-          //   actionType: data?.actionType,
-          // });
+          ) || [];
           setWasteBatches(pendingBatches);
         }
       }
 
-      // Handle specific actions based on actionType
-      const actionType = data?.actionType;
+            const actionType = data?.actionType;
       if (actionType === 'waste-collected' || actionType === 'waste-rejected') {
-        // console.log(
-        //   '[Municipality] Waste action detected - batches already updated from gameState'
-        // );
-        // No need to call fetchWasteBatches() - already updated from gameState above
       } else if (actionType === 'project-constructed') {
-        // console.log('[Municipality] Project constructed - refreshing projects');
+        fetchCityProjects();
+      } else if (actionType === 'auction-resolved' || actionType === 'external-purchase') {
+        fetchGameState();
         fetchCityProjects();
       }
     });
 
-    // COUNTDOWN EXPIRED EVENT
     const unsubCountdownExpired = subscribe('countdown-expired', (data: any) => {
-      // console.log('Countdown expired received in Municipality page:', data);
-      // Update game state if provided
       if (data?.gameState) {
         setGameState(data.gameState);
-
-        // Check if game is over
+        syncMyTeamFromGameState(data.gameState);
+        
         if (
           data.gameState.gameStatus === 'won' ||
           data.gameState.gameStatus === 'lost' ||
@@ -288,34 +362,28 @@ export default function MunicipalityPage() {
         ) {
           setTimeout(() => {
             router.push('/dashboard/game-over');
-          }, 3000); // Redirect after 3 seconds
+          }, 3000);
         }
       }
 
-      // Refresh data
       fetchWasteBatches();
       fetchCityProjects();
     });
 
-    // COUNTDOWN STARTED EVENT
     const unsubCountdownStarted = subscribe('countdown-started', (data: any) => {
-      // console.log('Countdown started received in Municipality page:', data);
-      // Update game state if provided to start the countdown
       if (data?.gameState) {
         setGameState(data.gameState);
+        syncMyTeamFromGameState(data.gameState);
       }
     });
 
-    // COUNTDOWN CANCELLED EVENT
     const unsubCountdownCancelled = subscribe('countdown-cancelled', (data: any) => {
-      // console.log('Countdown cancelled received in Municipality page:', data);
-      // Update game state if provided to clear the countdown
       if (data?.gameState) {
         setGameState(data.gameState);
+        syncMyTeamFromGameState(data.gameState);
       }
     });
 
-    // Player actions for live log
     const unsubPlayerAction = subscribe('player-action', (data: any) => {
       const time = getCountdownTime();
       const message = data?.playerName
@@ -324,30 +392,60 @@ export default function MunicipalityPage() {
       setLiveLogItems((prev) => [...prev, { time, message, isLive: true }].slice(-100));
     });
 
-    // TEMPORARILY COMMENTED OUT - system messages for live log
-    const unsubSystemMessage = subscribe('system-message', (_data: any) => {
-      // const time = getCountdownTime();
-      // setLiveLogItems((prev) =>
-      //   [...prev, { time, message: data.message, isLive: true, type: data.type }].slice(-100)
-      // );
-    });
+    const unsubSystemMessage = subscribe('system-message', (_data: any) => {});
 
     const unsubAuctionsResolved = subscribe('auctions-resolved', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
-      }
-    });
-    //external-purchase
-    const unsubExternalPurchase = subscribe('external-purchase', (data: any) => {
-      if (data?.gameState) {
-        setGameState(data.gameState);
+        syncMyTeamFromGameState(data.gameState);
       }
     });
 
-    // Surrender vote updates from other players
-    const unsubSurrenderUpdate = subscribe('surrender-update', (data: any) => {
-      if (data?.surrenderVotes && gameState) {
-        setGameState((prev) => prev ? { ...prev, surrenderVotes: data.surrenderVotes } : prev);
+    const unsubExternalPurchase = subscribe('external-purchase', (data: any) => {
+      if (data?.gameState) {
+        setGameState(data.gameState);
+        syncMyTeamFromGameState(data.gameState);
+      }
+    });
+
+    const unsubTransportStarted = subscribe('transport-started', (data: any) => {
+      if (data?.gameState) {
+        setGameState(data.gameState);
+        syncMyTeamFromGameState(data.gameState);
+        const currentTeam = data.gameState.teams?.find(
+          (team: TeamData) => team.sessionId === user?.currentSession
+        );
+        if (currentTeam?.activeTransports) {
+          setActiveTransports(currentTeam.activeTransports);
+        }
+      }
+      addNotification({
+        message: `🚛 ${data?.mode?.toUpperCase()} transport started! ${data?.batchMass?.toFixed(1)} tons will arrive in ${data?.durationSec || 30}s`,
+        type: 'info',
+      });
+    });
+
+    const unsubTransportCompleted = subscribe('transport-completed', (data: any) => {
+      if (data?.gameState) {
+        setGameState(data.gameState);
+        syncMyTeamFromGameState(data.gameState);
+        const currentTeam = data.gameState.teams?.find(
+          (team: TeamData) => team.sessionId === user?.currentSession
+        );
+        if (currentTeam?.activeTransports) {
+          setActiveTransports(currentTeam.activeTransports);
+        }
+      }
+      addNotification({
+        message: `✅ Transport completed! ${data?.batchMass?.toFixed(1)} tons delivered to MRF.`,
+        type: 'success',
+      });
+      fetchWasteBatches();
+    });
+
+        const unsubSurrenderUpdate = subscribe('surrender-update', (data: any) => {
+      if (data?.surrenderVotes) {
+        setMyTeam((prev) => (prev ? { ...prev, surrenderVotes: data.surrenderVotes } : prev));
       }
     });
 
@@ -364,41 +462,26 @@ export default function MunicipalityPage() {
       unsubSystemMessage && unsubSystemMessage();
       unsubAuctionsResolved && unsubAuctionsResolved();
       unsubExternalPurchase && unsubExternalPurchase();
+      unsubTransportStarted && unsubTransportStarted();
+      unsubTransportCompleted && unsubTransportCompleted();
       unsubSurrenderUpdate && unsubSurrenderUpdate();
     };
-  }, [subscribe, router, fetchWasteBatches, fetchCityProjects]);
+  }, [subscribe, router, fetchWasteBatches, fetchCityProjects, addNotification, syncMyTeamFromGameState]);
 
-  // Compute countdown-style timestamps for static logs
   const getDurationMinutes = () => {
     const c = currentGameState?.constants as any;
-    if (c?.REAL_TIME_GAME_DURATION_MINUTES) return c.REAL_TIME_GAME_DURATION_MINUTES;
+    if (c?.TEAM_GAME_DURATION_MINUTES) return c.TEAM_GAME_DURATION_MINUTES;
     try {
       const stored = localStorage.getItem('init_state');
-      if (stored) { const p = JSON.parse(stored); if (p?.constants?.REAL_TIME_GAME_DURATION_MINUTES) return p.constants.REAL_TIME_GAME_DURATION_MINUTES; }
+      if (stored) { const p = JSON.parse(stored); if (p?.constants?.TEAM_GAME_DURATION_MINUTES) return p.constants.TEAM_GAME_DURATION_MINUTES; }
     } catch {}
     return 15;
   };
   const totalDurMin = getDurationMinutes();
-  // TEMPORARILY COMMENTED OUT - static activity log messages
-  // const staticLogData =
-  //   currentGameState?.activityLog?.map((log, index) => {
-  //     const elapsedMin = ((index + 1) / (currentGameState.activityLog?.length || 1)) * (currentGameState.minutesElapsed || 0);
-  //     const remainMin = Math.max(0, totalDurMin - elapsedMin);
-  //     const remMins = Math.floor(remainMin);
-  //     const remSecs = Math.floor((remainMin - remMins) * 60);
-  //     return {
-  //       time: `[${String(remMins).padStart(2, '0')}:${String(remSecs).padStart(2, '0')}]`,
-  //       message: log,
-  //     };
-  //   })?.reverse() || [];
   const staticLogData: { time: string; message: string }[] = [];
 
-  // Use authoritative state from `fullPayload` when available
-  const authoritativeState = fullPayload?.gameState ?? currentGameState;
-
-  // Create selectable materials from municipalInventory
-  const selectableMaterials = authoritativeState?.municipalInventory
-    ? Object.entries(authoritativeState.municipalInventory)
+    const selectableMaterials = myTeam?.municipalInventory
+    ? Object.entries(myTeam.municipalInventory)
         .filter(([_, amount]) => (amount as number) >= 0.01)
         .map(([type, mass]) => ({
           id: type,
@@ -412,10 +495,15 @@ export default function MunicipalityPage() {
         }))
     : [];
 
-  // For formatted logs, merge static activity log with live websocket logs
+    const effectiveSelectedBatch =
+    (selectedWasteBatchId
+      ? wasteBatches.find((b) => b.id === selectedWasteBatchId) || null
+      : null) ??
+    selectedBatch ??
+    (selectedItem && 'status' in selectedItem ? (selectedItem as WasteBatch) : null);
+
   const logData = [...staticLogData, ...liveLogItems];
 
-  // Derived UI: combine summaries for display
   const turn = turnSummary || null;
   const stats = statistics || null;
 
@@ -427,7 +515,6 @@ export default function MunicipalityPage() {
     ? Date.now() - (authoritativeState.minutesElapsed || 0) * 60 * 1000
     : 0;
 
-  // Keep ref in sync for use in websocket callbacks (avoids re-subscription)
   useEffect(() => {
     shiftStartTimeRef.current = typeof shiftStartTime === 'number' ? shiftStartTime : 0;
   }, [shiftStartTime]);
@@ -441,7 +528,7 @@ export default function MunicipalityPage() {
       const stored = localStorage.getItem('init_state');
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (parsed?.constants?.REAL_TIME_GAME_DURATION_MINUTES) durationMin = parsed.constants.REAL_TIME_GAME_DURATION_MINUTES;
+        if (parsed?.constants?.TEAM_GAME_DURATION_MINUTES) durationMin = parsed.constants.TEAM_GAME_DURATION_MINUTES;
       }
     } catch {}
     const remainingMs = Math.max(0, durationMin * 60 * 1000 - elapsed);
@@ -479,70 +566,74 @@ export default function MunicipalityPage() {
       </div>
     );
   }
-  const handleCollectWaste = async () => {
-    if (!user?.currentSession) {
+
+    const handleCollectWasteWithTransport = async (mode: 'fast' | 'slow') => {
+    if (!user?.currentSession || !effectiveSelectedBatch) {
       addNotification({
-        message: 'No active session',
+        message: 'No active session or no batch selected',
         type: 'error',
       });
       return;
     }
 
-    // Check if selectedItem is a WasteBatch (has status property)
-    if (selectedItem && 'status' in selectedItem) {
-      if (selectedItem.status === 'PENDING') {
-        // Pre-check: ensure sufficient budget before attempting collection
-        const constants = authoritativeState?.constants;
-        const costPerTon =
-          (constants?.FIXED_DISTANCE_TO_MRF_KM ?? 10) *
-          (constants?.TRANSPORT_COST_PER_TON_KM ?? 2.5);
-        const estimatedCost = (selectedItem as WasteBatch).mass * costPerTon;
-        const currentBudget = authoritativeState?.budget ?? 0;
-        if (currentBudget < estimatedCost) {
-          addNotification({
-            message: `Insufficient budget. This collection costs $${estimatedCost.toFixed(2)} but your budget is $${currentBudget.toFixed(2)}.`,
-            type: 'error',
-          });
-          return;
-        }
+    if (effectiveSelectedBatch.status !== 'PENDING') {
+      addNotification({
+        message: `Batch is already ${effectiveSelectedBatch.status}`,
+        type: 'error',
+      });
+      return;
+    }
 
-        try {
-          const response = await municipalityService.collectWaste(user.currentSession, {
-            batchId: selectedItem.id,
-            sessionId: user.currentSession,
-          });
-          if (response.success) {
-            addNotification({
-              message: 'Waste Sent to MRF',
-              type: 'success',
-            });
-            setSelectedItem(null);
-            fetchGameState();
-            fetchWasteBatches();
-          } else {
-            addNotification({
-              message: response.message || 'Failed to collect waste',
-              type: 'error',
-            });
-          }
-        } catch (err: any) {
-          addNotification({
-            message:
-              err?.response?.data?.message ||
-              err?.message ||
-              'Insufficient budget for waste collection',
-            type: 'error',
-          });
+    const mass = effectiveSelectedBatch.mass;
+    const cost = mode === 'fast' ? mass * 50 : mass * 25;
+    const currentBudget = myTeam?.budget ?? 0;
+
+    if (currentBudget < cost) {
+      addNotification({
+        message: `Insufficient budget. ${mode} transport costs $${cost.toFixed(2)} but your budget is $${currentBudget.toFixed(2)}.`,
+        type: 'error',
+      });
+      return;
+    }
+
+    if (myTeam?.isEliminated) {
+      addNotification({
+        message: 'Your team has been eliminated. Cannot perform actions.',
+        type: 'error',
+      });
+      return;
+    }
+
+    try {
+      const response = await municipalityService.collectWasteWithTransport(
+        user.currentSession,
+        {
+          batchId: effectiveSelectedBatch.id,
+          sessionId: user.currentSession,
+          mode: mode,
         }
+      );
+      
+      if (response.success) {
+        addNotification({
+          message: `${mode.toUpperCase()} transport started! Waste will arrive in ${mode === 'fast' ? '30' : '60'} seconds.`,
+          type: 'success',
+        });
+                setSelectedItem(null);
+        setSelectedBatch(null);
+        setSelectedWasteBatchId(null);
+        fetchGameState();
+        fetchWasteBatches();
       } else {
         addNotification({
-          message: `Batch is already ${selectedItem.status}`,
+          message: response.message || 'Failed to start transport',
           type: 'error',
         });
       }
-    } else {
+    } catch (err: any) {
+      console.error('API error:', err);
       addNotification({
-        message: 'Please select a waste batch to collect',
+        message: err?.response?.data?.message || err?.message || 'Failed to start transport',
         type: 'error',
       });
     }
@@ -556,6 +647,14 @@ export default function MunicipalityPage() {
     if (!user?.currentSession) {
       addNotification({
         message: 'No active session',
+        type: 'error',
+      });
+      return;
+    }
+
+    if (myTeam?.isEliminated) {
+      addNotification({
+        message: 'Your team has been eliminated. Cannot perform actions.',
         type: 'error',
       });
       return;
@@ -594,75 +693,115 @@ export default function MunicipalityPage() {
 
   const handleSurrenderToggle = () => {
     if (!user?.currentSession) return;
+    if (myTeam?.isEliminated) {
+      addNotification({
+        message: 'Your team has been eliminated. Cannot surrender.',
+        type: 'error',
+      });
+      return;
+    }
     emit('surrender-toggle', { sessionId: user.currentSession });
   };
 
-  const surrenderVotes = authoritativeState?.surrenderVotes ?? [];
-  const canSurrender = (authoritativeState?.minutesElapsed ?? 0) >= 15;
+  const surrenderVotes = myTeam?.surrenderVotes ?? [];
+  const canSurrender = (myTeam?.minutesElapsed ?? 0) >= 15;
 
-  return (
-    <div className="bg-[#f3e9da] min-h-screen flex flex-col pb-6 lg:pb-8">
-      <div className="container mx-auto sm:p-0 px-4 flex flex-col gap-3">
-        <div className="flex-shrink-0">
-          <ShiftLog
-            logs={logData}
-            shiftStart={shiftStart}
-            shiftStartTime={authoritativeState?.gameStartTime}
-            gameOverCountdown={authoritativeState?.gameOverCountdown}
-            onGameOver={() => router.push('/dashboard/game-over')}
-            cityHealth={authoritativeState?.cityHealth}
-            budget={authoritativeState?.budget}
-            totalCO2={authoritativeState?.totalCO2}
-            wasteInventory={authoritativeState?.wasteInventory}
-            onStatusLog={handleStatusLog}
-          />
-        </div>
+    return (
+    <div className="lg:h-full flex flex-col lg:overflow-hidden">
+      <div className="bg-[#f3e9da] flex-1 flex flex-col lg:min-h-0 lg:overflow-hidden">
+        <div className="container mx-auto sm:p-0 px-4 flex flex-col flex-1 lg:min-h-0 lg:overflow-hidden gap-3">
+          <TransportProgressList transports={activeTransports} />
+          
+          <div className="flex-shrink-0">
+            <ShiftLog
+              logs={logData}
+              shiftStart={shiftStart}
+              shiftStartTime={authoritativeState?.gameStartTime}
+              gameOverCountdown={authoritativeState?.gameOverCountdown}
+              onGameOver={() => router.push('/dashboard/game-over')}
+              cityHealth={myTeam?.cityHealth}
+              budget={myTeam?.budget}
+              totalCO2={myTeam?.totalCO2}
+              wasteInventory={myTeam?.wasteInventory}
+              onStatusLog={handleStatusLog}
+            />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 flex-1 lg:min-h-0 lg:overflow-hidden">
+            <div className="xl:col-span-3 lg:col-span-2 col-span-1 flex flex-col lg:min-h-0 lg:overflow-hidden">
+                            <div
+                className="relative bg-cover bg-center mx-auto rounded-[20px] flex flex-col lg:min-h-0 overflow-hidden w-full flex-1"
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
-          <div className="xl:col-span-3 lg:col-span-2 col-span-1 flex flex-col">
-            <div
-              className="bg-cover bg-center mx-auto rounded-[20px] flex flex-col lg:min-h-0 lg:max-h-[calc(100vh-21rem)] hoverflow-hidden w-full flex-1"
-              style={{ backgroundImage: `url(${woodenBg.src})` }}
-            >
-              <MunicipalityCustomHeader
-                backgroundImage={woodenHead.src}
-                title={authoritativeState?.teamRole || currentGameState?.teamRole}
-              />
-              {/* <GameModeBadge gameMode={gameMode} /> */}
+                style={{ backgroundImage: `url(${woodenBg.src})` }}
+              >
+                <MunicipalityCustomHeader
+                  backgroundImage={woodenHead.src}
+                  title={`${myTeam?.teamName || 'Your City'} (${myTeam?.citySlot || '?'}) | ${teamCount} Teams`}
+                />
+                                {/* <GameModeBadge gameMode={gameMode} /> */}
 
-              <div className="flex justify-center mb-1 flex-shrink-0">
-                <div className="bg-white rounded-lg p-1 shadow-md">
-                  <button
-                    onClick={() => {
-                      setActiveTab('waste-collection');
-                      setSelectedItem(null);
-                      setSelectedMaterial(null);
-                      setSelectedProject(null);
-                    }}
-                    className={`px-4 py-1 rounded-md text-sm font-semibold transition-colors ${
-                      activeTab === 'waste-collection'
-                        ? 'bg-[#3A7D2C] text-white'
-                        : 'text-gray-600 hover:bg-gray-100'
-                    }`}
-                  >
-                    Waste Collection
-                  </button>
-                  <button
-                    onClick={() => {
-                      setActiveTab('city-projects');
-                      setSelectedItem(null);
-                      setSelectedMaterial(null);
-                      setSelectedProject(null);
-                    }}
-                    className={`px-4 py-1 rounded-md text-sm font-semibold transition-colors ${
-                      activeTab === 'city-projects'
-                        ? 'bg-[#3A7D2C] text-white'
-                        : 'text-gray-600 hover:bg-gray-100'
-                    }`}
-                  >
-                    Inventory
-                  </button>
-                  <button
+                <div className="absolute right-3 top-[72px]">
+                  <LiveTeamRankingToggle
+                    teams={currentGameState?.teams || []}
+                    currentSessionId={user?.currentSession || undefined}
+                  />
+                </div>
+
+                {/* ✅ Team Timer Display
+
+                <div className="flex justify-center my-1 flex-shrink-0">
+                  <div className="bg-white rounded-lg px-4 py-1 shadow-md border border-[#A99065]">
+                    <span className="font-bold text-[#33552C]">
+                      ⏱️ Time Remaining: 
+                      <span className={`ml-2 ${parseInt(teamTimer) < 3 ? 'text-red-600 animate-pulse' : 'text-[#50704C]'}`}>
+                        {teamTimer}
+                      </span>
+                    </span>
+                    {myTeam?.isEliminated && (
+                      <span className="ml-4 text-red-600 font-bold">💀 ELIMINATED</span>
+                    )}
+                    {myTeam?.gameStatus === 'completed' && (
+                      <span className="ml-4 text-green-600 font-bold">✅ COMPLETED</span>
+                    )}
+                  </div>
+                </div> */}
+                
+                <div className="flex justify-center mb-1 flex-shrink-0">
+                  <div className="bg-white rounded-lg p-1 shadow-md">
+                    <button
+                                            onClick={() => {
+                        setActiveTab('waste-collection');
+                                                setSelectedItem(null);
+                        setSelectedBatch(null);
+                        setSelectedWasteBatchId(null);
+                        setSelectedMaterial(null);
+                        setSelectedProject(null);
+                      }}
+                      className={`px-4 py-1 rounded-md text-sm font-semibold transition-colors ${
+                        activeTab === 'waste-collection'
+                          ? 'bg-[#3A7D2C] text-white'
+                          : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      Waste Collection
+                    </button>
+                    <button
+                                            onClick={() => {
+                        setActiveTab('city-projects');
+                                                setSelectedItem(null);
+                        setSelectedBatch(null);
+                        setSelectedWasteBatchId(null);
+                        setSelectedMaterial(null);
+                        setSelectedProject(null);
+                      }}
+                      className={`px-4 py-1 rounded-md text-sm font-semibold transition-colors ${
+                        activeTab === 'city-projects'
+                          ? 'bg-[#3A7D2C] text-white'
+                          : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      Inventory
+                    </button>
+                     <button
                     onClick={() => {
                       setActiveTab('project-details');
                       setSelectedItem(null);
@@ -680,17 +819,15 @@ export default function MunicipalityPage() {
                 </div>
               </div>
 
-              <div className="flex-1 min-h-0 overflow-hidden">
+              <div className="flex-1 lg:min-h-0 lg:overflow-hidden">
                 {activeTab === 'waste-collection' ? (
                   <MunicipalityWasteSelectedBox
                     key={wasteBatches.map((b) => b.id).join(',')}
                     wasteBatches={wasteBatches}
-                    selectedBatch={
-                      selectedItem && 'status' in selectedItem
-                        ? (selectedItem as WasteBatch)
-                        : null
-                    }
+                    selectedBatch={effectiveSelectedBatch}
                     setSelectedBatch={(batch) => {
+                      setSelectedWasteBatchId(batch.id);
+                      setSelectedBatch(batch);
                       setSelectedItem(batch);
                       setSelectedMaterial(null);
                       setSelectedProject(null);
@@ -707,6 +844,8 @@ export default function MunicipalityPage() {
                     }
                     setSelectedMaterial={(material) => {
                       setSelectedItem(material);
+                      setSelectedBatch(null);
+                      setSelectedWasteBatchId(null);
                       setSelectedMaterial((material as any).type);
                       setSelectedProject(null);
                     }}
@@ -785,7 +924,7 @@ export default function MunicipalityPage() {
                               <span className="inline-flex items-center rounded-md bg-[#EEF7EE] px-2 py-1 text-[11px] font-medium text-[#2B6B2F] border border-[#CDE8CE]">
                                 Health Bonus: +{Number(project.healthBonus || 0).toFixed(1)}%
                               </span>
-                              <span className="inline-flex items-center rounded-md bg-[#EEF3FB] px-2 py-1 text-[11px] font-medium text-[#234A8B] border border-[#D6E2F7]">
+                                                            <span className="inline-flex items-center rounded-md bg-[#EEF3FB] px-2 py-1 text-[11px] font-medium text-[#234A8B] border border-[#D6E2F7]">
                                 Wallet Credit: +${Number(project.budgetBonus || 0).toFixed(0)}
                               </span>
                               <span className="inline-flex items-center rounded-md bg-[#F3F0FF] px-2 py-1 text-[11px] font-medium text-[#5B3FA8] border border-[#DED3FB]">
@@ -798,51 +937,47 @@ export default function MunicipalityPage() {
                     </div>
                   </div>
                 )}
+            </div>
               </div>
             </div>
-          </div>
-
-          <div className="xl:col-span-1 lg:col-span-2 col-span-1 lg:max-h-[calc(100vh-21rem)] lg:overflow-y-auto lg:pr-1">
-            {activeTab === 'waste-collection' ? (
-              selectedItem && 'status' in selectedItem ? (
-                <WasteCollectAction
-                  budget={authoritativeState?.budget ?? currentGameState?.budget}
-                  totalCO2={authoritativeState?.totalCO2 ?? (currentGameState?.totalCO2 || 0)}
-                  wasteInventory={
-                    authoritativeState?.wasteInventory ?? currentGameState?.wasteInventory
+            <div className="xl:col-span-1 lg:col-span-2 col-span-1 lg:overflow-y-auto lg:min-h-0">
+              {activeTab === 'waste-collection' ? (
+                effectiveSelectedBatch ? (
+                  <WasteCollectAction
+                    budget={myTeam?.budget ?? 0}
+                    totalCO2={myTeam?.totalCO2 ?? 0}
+                    wasteInventory={myTeam?.wasteInventory ?? 0}
+                    maxCapacity={150}
+                    selectedBatch={effectiveSelectedBatch}
+                    handleCollectWaste={handleCollectWasteWithTransport}
+                    transportCostPerTon={
+                      (currentGameState?.constants?.FIXED_DISTANCE_TO_MRF_KM ?? 10) *
+                      (currentGameState?.constants?.TRANSPORT_COST_PER_TON_KM ?? 2.5)
+                    }
+                  />
+                ) : null
+              ) : selectedMaterial ? (
+                <MaterialConstructAction
+                  selectedMaterial={selectedMaterial}
+                  cityProjects={cityProjects}
+                  selectedProject={selectedProject}
+                  setSelectedProject={setSelectedProject}
+                  municipalInventory={
+                    myTeam?.municipalInventory ?? {
+                      paper: 0,
+                      plastic: 0,
+                      metal: 0,
+                      glass: 0,
+                      wood: 0,
+                    }
                   }
-                  maxCapacity={authoritativeState?.maxCapacity ?? currentGameState?.maxCapacity}
-                  selectedBatch={selectedItem}
-                  handleCollectWaste={handleCollectWaste}
-                  transportCostPerTon={
-                    (authoritativeState?.constants?.FIXED_DISTANCE_TO_MRF_KM ?? 10) *
-                    (authoritativeState?.constants?.TRANSPORT_COST_PER_TON_KM ?? 2.5)
-                  }
+                  handleConstructProject={handleConstructProject}
                 />
-              ) : null
-            ) : selectedMaterial ? (
-              <MaterialConstructAction
-                selectedMaterial={selectedMaterial}
-                cityProjects={cityProjects}
-                selectedProject={selectedProject}
-                setSelectedProject={setSelectedProject}
-                municipalInventory={
-                  authoritativeState?.municipalInventory ?? currentGameState?.municipalInventory
-                }
-                handleConstructProject={handleConstructProject}
-              />
-            ) : null}
+              ) : null}
+            </div>
           </div>
         </div>
-
-        {/* <SurrenderButton
-          playerId={user?._id ?? ''}
-          surrenderVotes={surrenderVotes}
-          canSurrender={canSurrender}
-          onToggle={handleSurrenderToggle}
-        /> */}
       </div>
-
       <GameChatbot pageContext="municipality" />
     </div>
   );

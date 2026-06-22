@@ -4,8 +4,32 @@ import { adminService } from '@/services/adminService';
 import { useNotificationStore } from '@/stores/notificationStore';
 import { AdminMonitorOverviewData, AdminPlayerGameRecord, AdminPlayerRow, AdminPlayerStatus } from '@/types/admin';
 import { useRouter } from 'next/navigation';
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState, useCallback } from 'react';
 import StudentRegistrationModal from '@/components/admin/StudentRegistrationModal';
+
+interface Room {
+  roomCode: string;
+  roomName: string;
+  ownerId: string;
+  ownerName: string;
+  isPrivate: boolean;
+  isAdminRoom: boolean;
+  maxTeams: number;
+  teams: Array<{
+    teamId: string;
+    citySlot: number;
+    players: Array<{
+      userId: string;
+      name: string;
+      role: string | null;
+      isLeader: boolean;
+    }>;
+    isReady: boolean;
+  }>;
+  status: 'waiting' | 'ready' | 'started' | 'completed';
+  gameSessionId?: string;
+  createdAt: string;
+}
 
 const statusColors: Record<AdminPlayerStatus, string> = {
   offline: 'bg-gray-200 text-gray-800',
@@ -43,6 +67,15 @@ export default function AdminMonitorPage() {
   const [historyRecords, setHistoryRecords] = useState<Record<string, AdminPlayerGameRecord[]>>({});
   const [historyLoading, setHistoryLoading] = useState<string | null>(null);
   const [showRegistrationModal, setShowRegistrationModal] = useState(false);
+  const [creatingRoom, setCreatingRoom] = useState(false);
+  const [rooms, setRooms] = useState<Room[]>([]);
+
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+
+  // ✅ Helper to get admin token
+  const getAdminToken = (): string | null => {
+    return localStorage.getItem('admin_monitor_token') || localStorage.getItem('auth_token');
+  };
   const isAdminAuthenticated = adminService.hasToken();
 
   const loadOverview = async (silent = false) => {
@@ -79,17 +112,201 @@ export default function AdminMonitorPage() {
     }
   };
 
+  const fetchRooms = useCallback(async () => {
+    try {
+      const adminToken = getAdminToken();
+      const response = await fetch(`${API_URL}/matchmaking/rooms`, {
+        headers: { Authorization: `Bearer ${adminToken}` },
+      });
+      const data = await response.json();
+      if (data.success) {
+        setRooms(data.data?.rooms || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch rooms:', error);
+    }
+  }, [API_URL]);
+
+  const handleStartGameFromAdmin = async (roomCode: string) => {
+    const confirmStart = confirm(`Start game for room ${roomCode}?`);
+    if (!confirmStart) return;
+
+    try {
+      const adminToken = getAdminToken();
+      const response = await fetch(`${API_URL}/matchmaking/rooms/start`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`,
+        },
+        body: JSON.stringify({ roomCode }),
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        addNotification({
+          message: `✅ Game started for room ${roomCode}!`,
+          type: 'success',
+        });
+        loadOverview(true);
+        fetchRooms();
+      } else {
+        addNotification({
+          message: data.message || 'Failed to start game',
+          type: 'error',
+        });
+      }
+    } catch (error: any) {
+      addNotification({
+        message: error.message || 'Failed to start game',
+        type: 'error',
+      });
+    }
+  };
+
   useEffect(() => {
     loadOverview();
+    fetchRooms();
 
     const interval = setInterval(() => {
       loadOverview(true);
+      fetchRooms();
     }, 10000);
 
     return () => {
       clearInterval(interval);
     };
   }, []);
+
+  // ✅ Handle creating a room
+  const handleCreateRoom = async () => {
+    setCreatingRoom(true);
+    
+    try {
+      const adminToken = getAdminToken();
+      
+      if (!adminToken) {
+        addNotification({
+          message: 'No admin token found. Please login again.',
+          type: 'error',
+        });
+        setCreatingRoom(false);
+        return;
+      }
+
+      const response = await fetch(`${API_URL}/matchmaking/rooms/admin-create`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminToken}`,
+        },
+        body: JSON.stringify({
+          isPrivate: false,
+          isAdminRoom: true,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        addNotification({
+          message: `✅ Room ${data.data.roomCode} created successfully!`,
+          type: 'success',
+        });
+        
+        window.location.href = `/dashboard/admin-game-room/${data.data.roomCode}`;
+      } else {
+        addNotification({
+          message: data.message || 'Failed to create room',
+          type: 'error',
+        });
+      }
+    } catch (error: any) {
+      console.error('Create room error:', error);
+      addNotification({
+        message: error.message || 'Failed to create room',
+        type: 'error',
+      });
+    } finally {
+      setCreatingRoom(false);
+    }
+  };
+
+  const handleStartGameForTeam = async (sessionId: string, teamName: string) => {
+    const confirmStart = confirm(`Start game for team "${teamName}"?`);
+    if (!confirmStart) return;
+
+    try {
+      const adminToken = getAdminToken();
+      
+      if (!adminToken) {
+        addNotification({
+          message: 'No admin token found. Please login again.',
+          type: 'error',
+        });
+        return;
+      }
+
+      const roomsResponse = await fetch(`${API_URL}/matchmaking/rooms`, {
+        headers: { 
+          'Authorization': `Bearer ${adminToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      const roomsData = await roomsResponse.json();
+
+      let targetRoomCode = null;
+      if (roomsData.success && roomsData.data?.rooms) {
+        for (const room of roomsData.data.rooms) {
+          const isInRoom = room.teams?.some((t: any) => t.sessionId === sessionId);
+          if (isInRoom) {
+            targetRoomCode = room.roomCode;
+            break;
+          }
+        }
+      }
+
+      if (!targetRoomCode) {
+        addNotification({
+          message: 'No game room found for this team',
+          type: 'error',
+        });
+        return;
+      }
+
+      const startResponse = await fetch(`${API_URL}/matchmaking/rooms/start`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminToken}`,
+        },
+        body: JSON.stringify({ roomCode: targetRoomCode }),
+      });
+
+      const startData = await startResponse.json();
+
+      if (startResponse.ok && startData.success) {
+        addNotification({
+          message: `✅ Game started for "${teamName}"!`,
+          type: 'success',
+        });
+        await loadOverview(true);
+        await fetchRooms();
+      } else {
+        addNotification({
+          message: startData.message || 'Failed to start game',
+          type: 'error',
+        });
+      }
+    } catch (error: any) {
+      console.error('Start game error:', error);
+      addNotification({
+        message: error.message || 'Failed to start game',
+        type: 'error',
+      });
+    }
+  };
 
   const filteredPlayers = useMemo(() => {
     if (!overview) return [];
@@ -109,14 +326,10 @@ export default function AdminMonitorPage() {
   }, [overview, search, statusFilter]);
 
   const handleForceExit = async (player: AdminPlayerRow) => {
-    if (!isAdminAuthenticated) {
-      addNotification({
-        message: 'Admin authorization required',
-        type: 'error',
-      });
-      router.push('/auth/login');
-      return;
-    }
+    // addNotification({
+    //   message: 'Admin authorization required',
+    //   type: 'error',
+    // });
 
     try {
       setActionLoadingUserId(player.userId);
@@ -211,7 +424,26 @@ export default function AdminMonitorPage() {
                 Track live sessions, team composition, role assignments, and force-reset players when needed.
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* ✅ Create Room Button */}
+              <button
+                onClick={handleCreateRoom}
+                disabled={creatingRoom}
+                className={`rounded-lg px-4 py-2 font-semibold transition-colors ${
+                  creatingRoom
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-[#3A7D2C] text-white hover:bg-[#2d6322]'
+                }`}
+              >
+                {creatingRoom ? (
+                  <span className="flex items-center gap-2">
+                    <span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full"></span>
+                    Creating...
+                  </span>
+                ) : (
+                  'Create Admin Game Room'
+                )}
+              </button>
               <button
                 onClick={() => loadOverview(true)}
                 className="rounded-lg border border-[#5b7f3b] px-4 py-2 text-[#2e4a1f] font-semibold hover:bg-[#eef8e4]"
@@ -308,7 +540,7 @@ export default function AdminMonitorPage() {
                     <th className="px-3 py-2">Match Info</th>
                     <th className="px-3 py-2">Runtime</th>
                     <th className="px-3 py-2">Action</th>
-                   </tr>
+                  </tr>
                 </thead>
                 <tbody>
                   {filteredPlayers.map((player) => (
@@ -317,10 +549,23 @@ export default function AdminMonitorPage() {
                         <td className="px-3 py-3 align-top">
                           <p className="font-semibold text-[#4f2d14]">{player.name}</p>
                           <p className="text-xs text-[#6d4b2a]">{player.email}</p>
+                          {player.status === 'pairing' && (
+                            <button
+                              onClick={() => player.currentSession && handleStartGameForTeam(player.currentSession, player.name)}
+                              className="mt-1 text-xs bg-[#3A7D2C] text-white px-2 py-0.5 rounded hover:bg-[#2d6322]"
+                            >
+                              Start Game for Team
+                            </button>
+                          )}
                         </td>
                         <td className="px-3 py-3 align-top text-sm text-[#4f2d14]">
-                          <span className="rounded-full px-2 py-1 text-xs font-semibold bg-blue-100 text-blue-800">
-                            {(player as any).accountType || 'student'}
+                          <span className={`rounded-full px-2 py-1 text-xs font-semibold ${
+                            player.accountType === 'admin' ? 'bg-red-100 text-red-800' :
+                            player.accountType === 'educator' ? 'bg-purple-100 text-purple-800' :
+                            player.accountType === 'spectator' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-blue-100 text-blue-800'
+                          }`}>
+                            {player.accountType || 'student'}
                           </span>
                         </td>
                         <td className="px-3 py-3 align-top">
@@ -328,7 +573,7 @@ export default function AdminMonitorPage() {
                             {statusLabel[player.status]}
                           </span>
                           <p className="text-xs mt-2 text-[#6d4b2a]">
-                            Socket: {player.hasActiveSocketConnections ? 'Connected' : 'No live socket'}
+                            Socket: {player.hasActiveSocketConnections ? '🟢 Connected' : '🔴 No live socket'}
                           </p>
                         </td>
                         <td className="px-3 py-3 align-top text-sm text-[#4f2d14]">
@@ -452,7 +697,7 @@ export default function AdminMonitorPage() {
             </div>
           </section>
 
-          {/* Match Groups */}
+          {/* Active Match Groups */}
           <section className="rounded-2xl border border-[#d3c4ad] bg-[#fff9ef] p-5 shadow-sm">
             <h2 className="text-xl font-bold text-[#4f2d14] mb-4">Active Match Groups</h2>
             {overview.matchGroups.length === 0 ? (
@@ -488,11 +733,104 @@ export default function AdminMonitorPage() {
                               </p>
                             ))}
                           </div>
+                          <button
+                            onClick={() => handleStartGameForTeam(team.sessionId, team.leaderName)}
+                            className={`mt-2 w-full rounded-md px-3 py-1 text-xs font-semibold text-white ${
+                              team.status === 'ready'
+                                ? 'bg-[#3A7D2C] hover:bg-[#2d6322]'
+                                : 'bg-gray-400 cursor-not-allowed'
+                            }`}
+                          >
+                            Start Game for {team.leaderName}'s Team
+                          </button>
                         </div>
                       ))}
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+          </section>
+
+          {/* ✅ Created Game Rooms - Admin Rooms */}
+          <section className="rounded-2xl border border-[#d3c4ad] bg-[#fff9ef] p-5 shadow-sm">
+            <h2 className="text-xl font-bold text-[#4f2d14] mb-4">🏠 Created Game Rooms</h2>
+            
+            {rooms.length === 0 ? (
+              <p className="text-[#6d4b2a]">No rooms created yet.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full border-separate border-spacing-y-2">
+                  <thead>
+                    <tr className="text-left text-xs uppercase tracking-wide text-[#7a5f41]">
+                      <th className="px-4 py-2">Room Code</th>
+                      <th className="px-4 py-2">Room Name</th>
+                      <th className="px-4 py-2">Teams</th>
+                      <th className="px-4 py-2">Status</th>
+                      <th className="px-4 py-2">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rooms.map((room) => {
+                      const teamCount = room.teams?.length || 0;
+                      const canStart = teamCount >= 2 && (room.status === 'waiting' || room.status === 'ready');
+                      
+                      return (
+                        <tr
+                          key={room.roomCode}
+                          className="bg-white rounded-lg shadow-[0_1px_6px_rgba(52,37,12,0.08)] hover:shadow-md transition-shadow"
+                        >
+                          <td className="px-4 py-3">
+                            <span className="font-mono font-bold text-[#33552C] text-lg">
+                              {room.roomCode}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-[#4f2d14]">
+                            {room.roomName}
+                            {room.isAdminRoom && (
+                              <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-700">
+                                Admin
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="text-sm font-semibold text-[#33552C]">
+                              {teamCount}/{room.maxTeams || 30}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                              room.status === 'waiting' ? 'bg-yellow-100 text-yellow-700' :
+                              room.status === 'ready' ? 'bg-green-100 text-green-700' :
+                              room.status === 'started' ? 'bg-blue-100 text-blue-700' :
+                              'bg-gray-100 text-gray-700'
+                            }`}>
+                              {room.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => window.location.href = `/dashboard/admin-game-room/${room.roomCode}`}
+                                className="px-3 py-1 bg-[#50704C] text-white rounded-md hover:bg-[#3A7D2C] transition-colors text-xs font-semibold"
+                              >
+                                View Room
+                              </button>
+                              {canStart && (
+                                <button
+                                  onClick={() => handleStartGameFromAdmin(room.roomCode)}
+                                  className="px-3 py-1 bg-[#3A7D2C] text-white rounded-md hover:bg-[#2d6322] transition-colors text-xs font-semibold"
+                                >
+                                  Start Game
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
           </section>

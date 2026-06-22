@@ -19,10 +19,30 @@ export const useWebSocket = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [pairingStatus, setPairingStatus] = useState<any>(null);
   const [realtimeUpdate, setRealtimeUpdate] = useState<any>(null);
-  const [pairData, setPairData] = useState<any>(null);
+    const [pairData, setPairData] = useState<any>(null);
   const router = useRouter();
 
+  const addNotification = useCallback((message: string, type: Notification['type'] = 'info') => {
+    const notification: Notification = {
+      id: Date.now(),
+      message,
+      type,
+    };
+    setNotifications((prev) => [...prev.slice(-4), notification]);
+  }, []);
+
+  // ✅ Check if this is an admin page
+  const isAdminPage = typeof window !== 'undefined' && 
+    (window.location.pathname?.startsWith('/admin') || 
+     window.location.pathname?.startsWith('/dashboard/admin-game-room/'));
+
   useEffect(() => {
+    // ✅ Skip WebSocket connection for admin pages
+    if (isAdminPage) {
+      console.log('[useWebSocket] Skipping WebSocket for admin page:', window.location.pathname);
+      return;
+    }
+
     socketManager.connect();
 
     const handleConnect: SocketCallback = () => {
@@ -41,12 +61,20 @@ export const useWebSocket = () => {
       addNotification(`Connection error: ${error.message}`, 'error');
     };
 
-    // Game state updates
+        // Game state updates
     const handleGameStateUpdate: GameStateCallback = (data) => {
       setGameState(data.gameState);
     };
 
+    // Action-level game state updates (same shape, plus action metadata)
+    const handleGameStateUpdated: SocketCallback = (data: any) => {
+      if (data?.gameState) {
+        setGameState(data.gameState);
+      }
+    };
+
     // Full game state with computed extras (authoritative source)
+
     const handleGameStateFull: SocketCallback = (data: any) => {
       if (data.gameState) {
         setGameState(data.gameState);
@@ -196,12 +224,14 @@ export const useWebSocket = () => {
     socketManager.on('connected', handleConnect);
     socketManager.on('disconnected', handleDisconnect);
     socketManager.on('connection_error', handleConnectionError);
-    socketManager.on('game-state-update', handleGameStateUpdate);
+        socketManager.on('game-state-update', handleGameStateUpdate);
+    socketManager.on('game-state-updated', handleGameStateUpdated);
     socketManager.on('game-state-full', handleGameStateFull);
-    socketManager.on('lobby-state-update', (data: any) => {
-      // console.log('[useWebSocket] lobby-state-update event:', data);
+
+    const handleLobbyStateUpdate: SocketCallback = (_data: any) => {
       addNotification('Lobby state updated', 'info');
-    });
+    };
+    socketManager.on('lobby-state-update', handleLobbyStateUpdate);
     socketManager.on('system-message', handleSystemMessage);
     socketManager.on('player-action', handlePlayerAction);
     socketManager.on('joined-game', handleJoinedGame);
@@ -219,51 +249,48 @@ export const useWebSocket = () => {
     socketManager.on('pairing-status-update', handlePairingStatusUpdate);
     socketManager.on('teams-paired', handleTeamsPaired);
     socketManager.on('partner-eliminated', handlePartnerEliminated);
-    socketManager.on('pairing-left', handlePairingLeft);
-    socketManager.on('pair-score-updated', (data: any) => {
-      // Handle pair score updates - could trigger UI updates or notifications
-      // console.log('Pair score updated:', data);
-      // Optional: Add notification for pair score changes
+        socketManager.on('pairing-left', handlePairingLeft);
+    const handlePairScoreUpdated: SocketCallback = (data: any) => {
       addNotification(`Pair score updated: ${data.averagePairHealth}%`, 'info');
-    });
-    socketManager.on('countdown-expired', (data: any) => {
-      // console.log('Countdown expired:', data);
+    };
+    const handleCountdownExpired: SocketCallback = () => {
       addNotification('Countdown expired!', 'warning');
-    });
-    socketManager.on('countdown-started', (data: any) => {
-      // console.log('Countdown started:', data);
+    };
+    const handleCountdownStarted: SocketCallback = (data: any) => {
       const reason = data?.reason || 'unknown';
       addNotification(`Game over countdown started: ${reason}`, 'warning');
-      // Update game state if provided
       if (data?.gameState) {
         setGameState(data.gameState);
       }
-    });
-    socketManager.on('countdown-cancelled', (data: any) => {
-      // console.log('Countdown cancelled:', data);
+    };
+    const handleCountdownCancelled: SocketCallback = (data: any) => {
       addNotification('Countdown cancelled!', 'info');
-      // Update game state if provided to clear the countdown
       if (data?.gameState) {
         setGameState(data.gameState);
       }
-    });
-    socketManager.on('auction-updated', (data: any) => {
+    };
+    const handleAuctionUpdated: SocketCallback = (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
       }
-    });
-    socketManager.on('lobby-activated', (data: any) => {
-      // console.log('Lobby activated:', data);
+    };
+    const handleLobbyActivated: SocketCallback = () => {
       addNotification('Game is starting...', 'success');
-    });
-    socketManager.on('game-started', (data: any) => {
-      // console.log('Game started:', data);
+    };
+    const handleGameStarted: SocketCallback = (data: any) => {
       addNotification('Game has started!', 'success');
-      // Update game state if provided
       if (data?.gameState) {
         setGameState(data.gameState);
       }
-    });
+    };
+
+    socketManager.on('pair-score-updated', handlePairScoreUpdated);
+    socketManager.on('countdown-expired', handleCountdownExpired);
+    socketManager.on('countdown-started', handleCountdownStarted);
+    socketManager.on('countdown-cancelled', handleCountdownCancelled);
+    socketManager.on('auction-updated', handleAuctionUpdated);
+    socketManager.on('lobby-activated', handleLobbyActivated);
+    socketManager.on('game-started', handleGameStarted);
     socketManager.on('error', handleError);
 
     return () => {
@@ -271,8 +298,11 @@ export const useWebSocket = () => {
       socketManager.off('connected', handleConnect);
       socketManager.off('disconnected', handleDisconnect);
       socketManager.off('connection_error', handleConnectionError);
-      socketManager.off('game-state-update', handleGameStateUpdate);
+            socketManager.off('game-state-update', handleGameStateUpdate);
+      socketManager.off('game-state-updated', handleGameStateUpdated);
       socketManager.off('game-state-full', handleGameStateFull);
+
+      socketManager.off('lobby-state-update', handleLobbyStateUpdate);
       socketManager.off('system-message', handleSystemMessage);
       socketManager.off('player-action', handlePlayerAction);
       socketManager.off('joined-game', handleJoinedGame);
@@ -290,26 +320,19 @@ export const useWebSocket = () => {
       socketManager.off('pairing-status-update', handlePairingStatusUpdate);
       socketManager.off('teams-paired', handleTeamsPaired);
       socketManager.off('partner-eliminated', handlePartnerEliminated);
-      socketManager.off('pairing-left', handlePairingLeft);
-      socketManager.off('pair-score-updated');
-      socketManager.off('countdown-expired');
-      socketManager.off('countdown-started');
-      socketManager.off('countdown-cancelled');
-      socketManager.off('auction-updated');
-      socketManager.off('lobby-activated');
-      socketManager.off('game-started');
+            socketManager.off('pairing-left', handlePairingLeft);
+      socketManager.off('pair-score-updated', handlePairScoreUpdated);
+      socketManager.off('countdown-expired', handleCountdownExpired);
+      socketManager.off('countdown-started', handleCountdownStarted);
+      socketManager.off('countdown-cancelled', handleCountdownCancelled);
+      socketManager.off('auction-updated', handleAuctionUpdated);
+      socketManager.off('lobby-activated', handleLobbyActivated);
+      socketManager.off('game-started', handleGameStarted);
       socketManager.off('error', handleError);
     };
-  }, []);
+  }, [addNotification, isAdminPage, router]);
 
-  const addNotification = useCallback((message: string, type: Notification['type'] = 'info') => {
-    const notification: Notification = {
-      id: Date.now(),
-      message,
-      type,
-    };
-    setNotifications((prev) => [...prev.slice(-4), notification]); // Keep last 5 notifications
-  }, []);
+  
 
   const subscribe = useCallback((event: GameEvent, callback: SocketCallback) => {
     socketManager.on(event, callback);

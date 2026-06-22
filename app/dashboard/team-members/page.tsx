@@ -25,11 +25,23 @@ const buildMembersWithPlaceholders = (
   currentMembers: Member[],
   totalSeats: number
 ): Member[] => {
-  const occupiedMembers = currentMembers.filter((member) => !member.placeholder);
+  // ✅ Filter out duplicate members by id
+  const seen = new Set<string | number>();
+  const uniqueMembers = currentMembers.filter((member) => {
+    if (member.placeholder) return true;
+    if (seen.has(member.id)) return false;
+    seen.add(member.id);
+    return true;
+  });
+
+  const occupiedMembers = uniqueMembers.filter((member) => !member.placeholder);
   const nextMembers = [...occupiedMembers];
 
   while (nextMembers.length < totalSeats) {
-    nextMembers.push({ id: `placeholder-${nextMembers.length}`, placeholder: true });
+    nextMembers.push({ 
+      id: `placeholder-${nextMembers.length}`, 
+      placeholder: true 
+    });
   }
 
   return nextMembers;
@@ -52,7 +64,6 @@ export default function TeamMembersPage() {
   const isFetchingLobbyRef = useRef(false);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Use WebSocket for real-time updates - joinGame is called automatically by useGameWebSocket
   const { subscribe, leaveGame } = useGameWebSocket(user?.currentSession || undefined);
 
   const applyLobbyState = useCallback((nextLobbyState: any) => {
@@ -124,7 +135,6 @@ export default function TeamMembersPage() {
 
       setError('');
       const response = await lobbyService.getLobbyState(userData.currentSession);
-      // console.log('Lobby State Response:', response);
 
       if (response.data?.lobbyState) {
         const lobbyState = response.data.lobbyState;
@@ -184,14 +194,10 @@ export default function TeamMembersPage() {
     };
   }, []);
 
-  // Removed polling to reduce auto refreshes, relying on WebSocket updates
-  // Helper function to extract players from the game state
   const extractPlayers = (data: any): Array<{ userId: string; selectedRole: string }> => {
     const players: Array<{ userId: string; selectedRole: string }> = [];
 
-    // First try to get playerRoles mapping
     if (data?.playerRoles && typeof data.playerRoles === 'object') {
-      // Convert the role-to-userId mapping to player objects
       Object.entries(data.playerRoles).forEach(([role, userId]) => {
         players.push({
           userId: userId as string,
@@ -200,10 +206,8 @@ export default function TeamMembersPage() {
       });
     }
 
-    // Also check for gameState.players (same structure)
     if (data?.gameState?.players && typeof data.gameState.players === 'object') {
       Object.entries(data.gameState.players).forEach(([role, userId]) => {
-        // Only add if not already added from playerRoles
         if (!players.find((p) => p.userId === userId)) {
           players.push({
             userId: userId as string,
@@ -215,7 +219,7 @@ export default function TeamMembersPage() {
 
     return players;
   };
-  // Listen for WebSocket events that might indicate lobby changes
+
   useEffect(() => {
     if (!user?.currentSession) return;
 
@@ -248,13 +252,6 @@ export default function TeamMembersPage() {
       scheduleLobbyRefresh();
     });
 
-    // const unsubscribePairingJoined = subscribe('pairing-joined', (data: any) => {
-    //   if (data?.sessionId && data.sessionId !== user.currentSession) {
-    //     return;
-    //   }
-    //   scheduleLobbyRefresh();
-    // });
-
     const unsubscribePlayerLeft = subscribe('player-left', (data: any) => {
       if (data?.sessionId && data.sessionId !== user.currentSession) {
         return;
@@ -286,7 +283,6 @@ export default function TeamMembersPage() {
     });
 
     const unSubcribeGameStarted = subscribe('game-started', (data: any) => {
-      // console.log('Game started event received in role page:', data);
       if (data?.sessionId === user?.currentSession) {
         const players = extractPlayers(data);
         const currentPlayer = players.find((player: any) => player.userId === user._id);
@@ -304,20 +300,15 @@ export default function TeamMembersPage() {
     });
 
     const unsubLobbyActivated = subscribe('lobby-activated', (data: any) => {
-      // console.log('Lobby activated event received: in role page', data);
-
       if (data?.lobby?.status === 'active') {
-        // For lobby-activated event, the structure might be different
         let players: Array<{ userId: string; selectedRole: string }> = [];
 
         if (Array.isArray(data?.lobby?.players)) {
-          // If players is an array with full player objects
           players = data.lobby.players.map((player: any) => ({
             userId: player.userId || player._id,
             selectedRole: player.selectedRole,
           }));
         } else if (data?.lobby?.players && typeof data.lobby.players === 'object') {
-          // If it's a role-to-userId mapping
           Object.entries(data.lobby.players).forEach(([role, userId]) => {
             players.push({
               userId: userId as string,
@@ -442,13 +433,14 @@ export default function TeamMembersPage() {
         <GameModeBadge gameMode={lobbyState?.gameMode} />
         <div className="flex-1 space-y-2 bg-center flex flex-col justify-between">
           <div className="grid lg:grid-cols-3 md:grid-cols-2 grid-cols-1 gap-6 md:px-8 px-4 pt-6 w-full flex-1">
-            {members.map((m) => {
+            {members.map((m, index) => {
               const isActive = active === m.id;
+              // ✅ Use a combination of id and index for unique keys
+              const uniqueKey = m.placeholder ? `placeholder-${index}` : m.id;
 
               return (
                 <button
-                  key={m.id}
-                  // onClick={() => setActive(m.id)}
+                  key={uniqueKey}
                   className={
                     `relative w-full text-left p-6 transform transition-all duration-150 focus:outline-none ` +
                     (isActive

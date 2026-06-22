@@ -19,66 +19,147 @@ const adminApi = axios.create({
   timeout: 15000,
 });
 
-adminApi.interceptors.request.use(config => {
-  const adminToken = secureStorage.getItem(ADMIN_TOKEN_KEY);
+// ✅ Request interceptor - try both admin token and regular auth token
+adminApi.interceptors.request.use(
+  (config) => {
+    let token = secureStorage.getItem(ADMIN_TOKEN_KEY);
+    
+    if (!token) {
+      token = secureStorage.getItem('auth_token');
+    }
 
-  if (adminToken) {
-    config.headers.Authorization = `Bearer ${adminToken}`;
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+      console.log(`🔑 API Request to ${config.url}: Token found`);
+    } else {
+      console.warn(`⚠️ API Request to ${config.url}: No token found`);
+    }
+
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// ✅ Response interceptor for better error handling
+adminApi.interceptors.response.use(
+  (response) => {
+    return response;
+  },
+  (error) => {
+    if (error.response?.status === 401) {
+      console.warn('🔴 401 Unauthorized - Token may be expired or invalid');
+    }
+    return Promise.reject(error);
   }
-
-  return config;
-});
+);
 
 export const adminService = {
   async login(username: string, password: string): Promise<AdminLoginResponse> {
-    const response = await adminApi.post<AdminLoginResponse>(
-      '/admin/auth/login',
-      {
-        username,
-        password,
+    try {
+      console.log('🔐 Admin login attempt:', { username });
+
+      const response = await adminApi.post<AdminLoginResponse>(
+        '/admin/auth/login',
+        {
+          username,
+          password,
+        }
+      );
+
+      console.log('📦 Admin login response:', response.data);
+
+            if (response.data.success && response.data.data?.token) {
+        secureStorage.setItem(ADMIN_TOKEN_KEY, response.data.data.token);
+
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(ADMIN_TOKEN_KEY, response.data.data.token);
+        }
+
+        console.log('✅ Admin token stored successfully');
+        console.log('🔑 Token:', response.data.data.token.substring(0, 50) + '...');
       }
-    );
 
-    if (response.data.success && response.data.data?.token) {
-      secureStorage.setItem(ADMIN_TOKEN_KEY, response.data.data.token);
+
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Admin login error:', error.message);
+      if (error.response) {
+        console.error('📄 Response status:', error.response.status);
+        console.error('📄 Response data:', error.response.data);
+      }
+      throw error;
     }
-
-    return response.data;
   },
 
   async getOverview(): Promise<AdminOverviewResponse> {
-    const response = await adminApi.get<AdminOverviewResponse>('/admin/monitor/overview');
-    return response.data;
+    try {
+      console.log('📊 Fetching admin overview...');
+      const response = await adminApi.get<AdminOverviewResponse>('/admin/monitor/overview');
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Failed to fetch overview:', error.message);
+      throw error;
+    }
   },
 
   async forceExitPlayer(userId: string, reason?: string): Promise<AdminForceExitResponse> {
-    const response = await adminApi.patch<AdminForceExitResponse>(
-      `/admin/players/${userId}/force-exit`,
-      {
-        reason,
-      }
-    );
-
-    return response.data;
+    try {
+      console.log(`🚪 Force exiting player: ${userId}`);
+      const response = await adminApi.patch<AdminForceExitResponse>(
+        `/admin/players/${userId}/force-exit`,
+        {
+          reason: reason || 'Admin manual reset',
+        }
+      );
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Failed to force exit player:', error.message);
+      throw error;
+    }
   },
 
-  logout(): void {
+    logout(): void {
+    console.log('🔓 Admin logout');
     secureStorage.removeItem(ADMIN_TOKEN_KEY);
+
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(ADMIN_TOKEN_KEY);
+    }
   },
 
-  hasToken(): boolean {
-    return Boolean(secureStorage.getItem(ADMIN_TOKEN_KEY));
+
+    hasToken(): boolean {
+    const secureToken = secureStorage.getItem(ADMIN_TOKEN_KEY);
+    const localToken = typeof window !== 'undefined' ? localStorage.getItem(ADMIN_TOKEN_KEY) : null;
+    const token = secureToken || localToken;
+
+    console.log(`🔍 Has admin token: ${!!token}`);
+    return Boolean(token);
   },
+
+
+    getToken(): string | null {
+    const secureToken = secureStorage.getItem(ADMIN_TOKEN_KEY);
+    const localToken = typeof window !== 'undefined' ? localStorage.getItem(ADMIN_TOKEN_KEY) : null;
+    return secureToken || localToken;
+  },
+
 
   async getPlayerHistory(
     userId: string,
     limit = 10,
     page = 0
   ): Promise<AdminPlayerHistoryResponse> {
-    const response = await adminApi.get<AdminPlayerHistoryResponse>(
-      `/admin/players/${userId}/history`,
-      { params: { limit, page } }
-    );
-    return response.data;
+    try {
+      console.log(`📜 Fetching history for player: ${userId}`);
+      const response = await adminApi.get<AdminPlayerHistoryResponse>(
+        `/admin/players/${userId}/history`,
+        { params: { limit, page } }
+      );
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Failed to fetch player history:', error.message);
+      throw error;
+    }
   },
 };

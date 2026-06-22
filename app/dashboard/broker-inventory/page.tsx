@@ -7,6 +7,8 @@ import { BrokerGlobalAuctionSelectedBox } from '@/components/ui/selectedBox/Brok
 import ShiftLog from '@/components/ui/shiftLog/ShiftLog';
 import { SurrenderButton } from '@/components/ui/surrenderButton/SurrenderButton';
 import GameChatbot from '@/components/ui/chatbot/GameChatbot';
+import LiveTeamRankingToggle from '@/components/ui/LiveTeamRankingToggle';
+
 import { useWebSocket } from '@/hooks/useWebSocket';
 import woodenBg from '@/public/assets/images/wooden_bg.png';
 import woodenHead from '@/public/assets/images/woodenHead.png';
@@ -14,7 +16,7 @@ import { brokerService } from '@/services/brokerService';
 import { gameService } from '@/services/gameService';
 import { useAuthStore } from '@/stores/authStore';
 import { useNotificationStore } from '@/stores/notificationStore';
-import { GameState } from '@/types/besse';
+import { GameState, TeamData } from '@/types/besse';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -26,6 +28,7 @@ export default function BrokerInventoryPage() {
     'global-auctions'
   );
   const [gameState, setGameState] = useState<GameState | null>(null);
+  const [myTeam, setMyTeam] = useState<TeamData | null>(null);
   const [globalAuctions, setGlobalAuctions] = useState<any[]>([]);
   const [externalStock, setExternalStock] = useState<any[]>([]);
   const [selectedAuction, setSelectedAuction] = useState<any | null>(null);
@@ -37,12 +40,20 @@ export default function BrokerInventoryPage() {
   const [statistics, setStatistics] = useState<any | null>(null);
   const [countdownRemaining, setCountdownRemaining] = useState<number | null>(null);
   const [lastActionType, setLastActionType] = useState<string | null>(null);
+  const [teamTimer, setTeamTimer] = useState<string>('15:00');
   const [gameMode] = useState<string | null>(() =>
     typeof window !== 'undefined' ? localStorage.getItem('game_mode') : null
   );
   const { getCurrentGameSession, notifications, isConnected, subscribe, joinGame, emit } = useWebSocket();
 
   const currentGameState = gameState;
+
+  const syncMyTeamFromGameState = useCallback((gs: GameState | null) => {
+    if (!gs || !user?.currentSession) return;
+    const currentTeam = gs.teams?.find((team: TeamData) => team.sessionId === user.currentSession);
+    if (currentTeam) setMyTeam(currentTeam);
+  }, [user?.currentSession]);
+
 
   const fetchGameState = async () => {
     if (!user?.currentSession) {
@@ -55,6 +66,15 @@ export default function BrokerInventoryPage() {
       const response = await gameService.getGameState(user.currentSession);
       if (response.success && response.data) {
         setGameState(response.data.gameState);
+        
+        // ✅ Find current team
+        const currentTeam = response.data.gameState.teams?.find(
+          (team: TeamData) => team.sessionId === user.currentSession
+        );
+        if (currentTeam) {
+          setMyTeam(currentTeam);
+        }
+        
         if (
           response.data.gameState.gameStatus === 'complete' ||
           response.data.gameState.gameStatus === 'lost' ||
@@ -77,6 +97,7 @@ export default function BrokerInventoryPage() {
   const fetchGlobalAuctions = async () => {
     if (!user?.currentSession) return;
     try {
+      // ✅ Get auctions from ALL teams in the room
       const response = await brokerService.getActiveAuctions(user.currentSession);
       if (response.success && response.data) {
         setGlobalAuctions(response.data.auctions);
@@ -153,8 +174,13 @@ export default function BrokerInventoryPage() {
           message: `Successfully purchased ${amount}t of ${materialType}!`,
           type: 'success',
         });
-        fetchExternalStock();
-        fetchGameState();
+        // ✅ Wait for both calls to complete before continuing
+        await Promise.all([
+          fetchExternalStock(),
+          fetchGameState()
+        ]);
+        // ✅ Force a refresh of the shift log by updating a dummy state if needed
+        // The ShiftLog component receives budget from myTeam, which is updated in fetchGameState
       } else {
         addNotification({
           message: response.message || 'Failed to purchase material',
@@ -175,14 +201,32 @@ export default function BrokerInventoryPage() {
     fetchExternalStock();
   }, []);
 
-  // Fetch global auctions every 10 seconds
+  // Fetch global auctions every 3 seconds
   useEffect(() => {
     const intervalId = setInterval(() => {
       fetchGlobalAuctions();
-    }, 3000); // 3 seconds
+    }, 3000);
 
     return () => clearInterval(intervalId);
   }, [user?.currentSession]);
+
+  // ✅ Team timer countdown
+  useEffect(() => {
+    if (!myTeam) return;
+
+    const updateTimer = () => {
+      const now = Date.now();
+      const elapsed = (now - myTeam.teamStartTime) / 60000; // minutes
+      const remaining = Math.max(0, 15 - elapsed);
+      const mins = Math.floor(remaining);
+      const secs = Math.floor((remaining - mins) * 60);
+      setTeamTimer(`${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`);
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [myTeam]);
 
   const [liveLogItems, setLiveLogItems] = useState<
     {
@@ -198,15 +242,7 @@ export default function BrokerInventoryPage() {
 
   useEffect(() => {
     if (user?.currentSession && isConnected) {
-      // console.log('Broker Inventory page: Calling joinGame with sessionId:', user.currentSession);
       joinGame(user.currentSession);
-    } else {
-      // console.log(
-      //   'Broker Inventory page: Not joining yet - user.currentSession:',
-      //   user?.currentSession,
-      //   'isConnected:',
-      //   isConnected
-      // );
     }
   }, [user?.currentSession, isConnected, joinGame]);
 
@@ -228,8 +264,9 @@ export default function BrokerInventoryPage() {
 
   useEffect(() => {
     const unsubGameStateUpdate = subscribe('game-state-update', (data: any) => {
-      if (data?.gameState) {
+            if (data?.gameState) {
         setGameState(data.gameState);
+        syncMyTeamFromGameState(data.gameState);
         if (
           data.gameState.gameStatus === 'complete' ||
           data.gameState.gameStatus === 'lost' ||
@@ -241,8 +278,9 @@ export default function BrokerInventoryPage() {
     });
 
     const unsubGameStateFull = subscribe('game-state-full', (data: any) => {
-      if (data?.gameState) {
+            if (data?.gameState) {
         setGameState(data.gameState);
+        syncMyTeamFromGameState(data.gameState);
         if (
           data.gameState.gameStatus === 'complete' ||
           data.gameState.gameStatus === 'lost' ||
@@ -261,43 +299,46 @@ export default function BrokerInventoryPage() {
       setLastActionType(data?.actionType || null);
     });
 
-    const unsubSystemCheckUpdate = subscribe('system-check-update', (data: any) => {
+        const unsubSystemCheckUpdate = subscribe('system-check-update', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
+        syncMyTeamFromGameState(data.gameState);
       }
     });
 
-    const unsubTurnEnded = subscribe('turn-ended', (data: any) => {
+        const unsubTurnEnded = subscribe('turn-ended', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
+        syncMyTeamFromGameState(data.gameState);
       }
     });
 
-    const unsubGameActions = subscribe('game-state-updated', (data: any) => {
+        const unsubGameActions = subscribe('game-state-updated', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
+        syncMyTeamFromGameState(data.gameState);
       }
+
 
       const actionType = data?.actionType;
-      if (
+            if (
         actionType === 'bid-placed' ||
         actionType === 'auction-updated' ||
+        actionType === 'auction-resolved' ||
         actionType === 'material-graded'
       ) {
-        // console.log('[Broker] Auction action - refreshing auctions');
         fetchGlobalAuctions();
+        fetchGameState();
       } else if (actionType === 'external-purchase') {
-        // console.log('[Broker] External purchase - refreshing stock');
         fetchExternalStock();
+        fetchGameState();
       }
     });
 
-    const unsubCountdownExpired = subscribe('countdown-expired', (data: any) => {
-      // console.log('Countdown expired received in Broker page:', data);
-
+        const unsubCountdownExpired = subscribe('countdown-expired', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
-
+        syncMyTeamFromGameState(data.gameState);
         if (
           data.gameState.gameStatus === 'complete' ||
           data.gameState.gameStatus === 'lost' ||
@@ -308,22 +349,21 @@ export default function BrokerInventoryPage() {
           }, 3000);
         }
       }
-
       fetchGlobalAuctions();
       fetchExternalStock();
     });
 
-    const unsubCountdownStarted = subscribe('countdown-started', (data: any) => {
-      // console.log('Countdown started received in Broker page:', data);
+        const unsubCountdownStarted = subscribe('countdown-started', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
+        syncMyTeamFromGameState(data.gameState);
       }
     });
 
-    const unsubCountdownCancelled = subscribe('countdown-cancelled', (data: any) => {
-      // console.log('Countdown cancelled received in Broker page:', data);
+        const unsubCountdownCancelled = subscribe('countdown-cancelled', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
+        syncMyTeamFromGameState(data.gameState);
       }
     });
 
@@ -342,24 +382,18 @@ export default function BrokerInventoryPage() {
       setLiveLogItems((prev) => [...prev, { time, message, isLive: true }].slice(-100));
     });
 
-    // TEMPORARILY COMMENTED OUT - system messages for live log
-    const unsubSystemMessage = subscribe('system-message', (_data: any) => {
-      // const st = shiftStartTimeRef.current;
-      // const elapsed = st ? Math.max(0, Date.now() - new Date(st).getTime()) : 0;
-      // let durationMin = 15;
-      // try { const stored = localStorage.getItem('init_state'); if (stored) { const p = JSON.parse(stored); if (p?.constants?.REAL_TIME_GAME_DURATION_MINUTES) durationMin = p.constants.REAL_TIME_GAME_DURATION_MINUTES; } } catch {}
-      // const remainingMs = Math.max(0, durationMin * 60 * 1000 - elapsed);
-      // const mins = Math.floor(remainingMs / 60000);
-      // const secs = Math.floor((remainingMs % 60000) / 1000);
-      // const time = `[${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}]`;
-      // setLiveLogItems((prev) =>
-      //   [...prev, { time, message: data.message, isLive: true, type: data.type }].slice(-100)
-      // );
+    const unsubSystemMessage = subscribe('system-message', (_data: any) => {});
+
+        const unsubAuctionResolved = subscribe('auction-resolved', (_data: any) => {
+      // Ensure wallet/inventory UI updates immediately for winner/loser teams
+      fetchGlobalAuctions();
+      fetchGameState();
     });
 
     const unsubSurrenderUpdate = subscribe('surrender-update', (data: any) => {
-      if (data?.surrenderVotes) {
-        setGameState((prev) => prev ? { ...prev, surrenderVotes: data.surrenderVotes } : prev);
+      if (data?.surrenderVotes && myTeam) {
+        const updatedTeam = { ...myTeam, surrenderVotes: data.surrenderVotes };
+        setMyTeam(updatedTeam);
       }
     });
 
@@ -372,35 +406,23 @@ export default function BrokerInventoryPage() {
       unsubCountdownExpired && unsubCountdownExpired();
       unsubCountdownStarted && unsubCountdownStarted();
       unsubCountdownCancelled && unsubCountdownCancelled();
-      unsubPlayerAction && unsubPlayerAction();
+            unsubPlayerAction && unsubPlayerAction();
       unsubSystemMessage && unsubSystemMessage();
+      unsubAuctionResolved && unsubAuctionResolved();
       unsubSurrenderUpdate && unsubSurrenderUpdate();
     };
-  }, [subscribe, router, fetchGameState, fetchGlobalAuctions, fetchExternalStock]);
+  }, [subscribe, router, fetchGameState, fetchGlobalAuctions, fetchExternalStock, syncMyTeamFromGameState]);
 
-  // Compute countdown-style timestamps for static logs
   const getDurationMinutes = () => {
     const c = currentGameState?.constants as any;
-    if (c?.REAL_TIME_GAME_DURATION_MINUTES) return c.REAL_TIME_GAME_DURATION_MINUTES;
+    if (c?.TEAM_GAME_DURATION_MINUTES) return c.TEAM_GAME_DURATION_MINUTES;
     try {
       const stored = localStorage.getItem('init_state');
-      if (stored) { const p = JSON.parse(stored); if (p?.constants?.REAL_TIME_GAME_DURATION_MINUTES) return p.constants.REAL_TIME_GAME_DURATION_MINUTES; }
+      if (stored) { const p = JSON.parse(stored); if (p?.constants?.TEAM_GAME_DURATION_MINUTES) return p.constants.TEAM_GAME_DURATION_MINUTES; }
     } catch {}
     return 15;
   };
   const totalDurMin = getDurationMinutes();
-  // TEMPORARILY COMMENTED OUT - static activity log messages
-  // const staticLogData =
-  //   currentGameState?.activityLog?.map((log, index) => {
-  //     const elapsedMin = ((index + 1) / (currentGameState.activityLog?.length || 1)) * (currentGameState.minutesElapsed || 0);
-  //     const remainMin = Math.max(0, totalDurMin - elapsedMin);
-  //     const remMins = Math.floor(remainMin);
-  //     const remSecs = Math.floor((remainMin - remMins) * 60);
-  //     return {
-  //       time: `[${String(remMins).padStart(2, '0')}:${String(remSecs).padStart(2, '0')}]`,
-  //       message: log,
-  //     };
-  //   })?.reverse() || [];
   const staticLogData: { time: string; message: string }[] = [];
 
   const authoritativeState = fullPayload?.gameState ?? currentGameState;
@@ -421,7 +443,6 @@ export default function BrokerInventoryPage() {
     ? Date.now() - (authoritativeState.minutesElapsed || 0) * 60 * 1000
     : 0;
 
-  // Keep ref in sync for use in websocket callbacks
   useEffect(() => {
     shiftStartTimeRef.current = typeof shiftStartTime === 'number' ? shiftStartTime : 0;
   }, [shiftStartTime]);
@@ -456,121 +477,132 @@ export default function BrokerInventoryPage() {
     );
   }
 
+  // ✅ Get all teams in the room
+  const allTeams = currentGameState?.teams || [];
+  const teamCount = allTeams.length;
+
   return (
-    <div className="bg-[#f3e9da] min-h-screen flex flex-col pb-6 lg:pb-8">
-      <div className="container mx-auto sm:p-0 px-4 flex flex-col gap-3">
-        <div className="flex-shrink-0">
-          <ShiftLog
-            logs={logData}
-            shiftStart={shiftStart}
-            shiftStartTime={authoritativeState?.gameStartTime}
-            gameOverCountdown={authoritativeState?.gameOverCountdown}
-            onGameOver={() => router.push('/dashboard/game-over')}
-            cityHealth={authoritativeState?.cityHealth}
-            budget={authoritativeState?.budget}
-            totalCO2={authoritativeState?.totalCO2}
-            wasteInventory={authoritativeState?.wasteInventory}
-            onStatusLog={handleStatusLog}
-          />
-        </div>
+    <div className="lg:h-full flex flex-col lg:overflow-hidden">
+      <div className="bg-[#f3e9da] flex-1 flex flex-col lg:min-h-0 lg:overflow-hidden">
+        <div className="container mx-auto sm:p-0 px-4 flex flex-col flex-1 lg:min-h-0 lg:overflow-hidden gap-3">
+          <div className="flex-shrink-0">
+            <ShiftLog
+              logs={logData}
+              shiftStart={shiftStart}
+              shiftStartTime={authoritativeState?.gameStartTime}
+              gameOverCountdown={authoritativeState?.gameOverCountdown}
+              onGameOver={() => router.push('/dashboard/game-over')}
+              cityHealth={myTeam?.cityHealth}
+              budget={myTeam?.budget}
+              totalCO2={myTeam?.totalCO2}
+              wasteInventory={myTeam?.wasteInventory}
+              onStatusLog={handleStatusLog}
+            />
+          </div>
+          <div className="grid grid-cols-1 gap-3 flex-1 lg:min-h-0 lg:overflow-hidden">
+            <div className="col-span-1 flex flex-col lg:min-h-0 lg:overflow-hidden">
+                            <div
+                className="relative bg-cover bg-center mx-auto rounded-[20px] flex flex-col lg:min-h-0 overflow-hidden w-full flex-1"
 
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_26rem] gap-3 items-start">
-          <div className="col-span-1 flex flex-col min-w-0">
-            <div
-              className="bg-cover bg-center mr-auto rounded-[20px] flex flex-col lg:min-h-0 lg:max-h-[calc(100vh-21rem)] overflow-hidden w-full flex-1"
-              style={{ backgroundImage: `url(${woodenBg.src})` }}
-            >
-              <MunicipalityCustomHeader
-                backgroundImage={woodenHead.src}
-                title={authoritativeState?.teamRole || currentGameState?.teamRole}
-              />
-              {/* <GameModeBadge gameMode={gameMode} /> */}
+                style={{ backgroundImage: `url(${woodenBg.src})` }}
+              >
+                <MunicipalityCustomHeader
+                  backgroundImage={woodenHead.src}
+                  title={`${myTeam?.teamName || 'Your City'} (${myTeam?.citySlot || '?'}) | ${teamCount} Teams in Room`}
+                />
+                                {/* <GameModeBadge gameMode={gameMode} /> */}
 
-              <div className="flex justify-center mb-1 flex-shrink-0">
-                <div className="bg-white rounded-lg p-1 shadow-md flex">
-                  <button
-                    onClick={() => setActiveTab('global-auctions')}
-                    className={`px-4 py-1 rounded-md text-sm font-semibold transition-colors ${
-                      activeTab === 'global-auctions'
-                        ? 'bg-[#3A7D2C] text-white'
-                        : 'text-gray-600 hover:bg-gray-100'
-                    }`}
-                  >
-                    Global Auctions
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('external-wholesaler')}
-                    className={`px-4 py-1 rounded-md text-sm font-semibold transition-colors ${
-                      activeTab === 'external-wholesaler'
-                        ? 'bg-[#3A7D2C] text-white'
-                        : 'text-gray-600 hover:bg-gray-100'
-                    }`}
-                  >
-                    External Wholesaler
-                  </button>
+                <div className="absolute right-3 top-[72px]">
+                  <LiveTeamRankingToggle
+                    teams={currentGameState?.teams || []}
+                    currentSessionId={user?.currentSession || undefined}
+                  />
                 </div>
-              </div>
 
-              <div className="flex-1 min-h-0 overflow-y-auto">
-                {activeTab === 'global-auctions' ? (
-                  <BrokerGlobalAuctionSelectedBox
-                    auctions={globalAuctions}
-                    selectedAuction={selectedAuction}
-                    setSelectedAuction={setSelectedAuction}
-                    currentUserId={user?._id}
-                    onPlaceBid={handlePlaceBid}
-                  />
-                ) : (
-                  <BrokerExternalWholesalerSelectedBox
-                    key={externalStock.map((s) => s.materialType).join(',')}
-                    stock={externalStock}
-                    selectedStock={selectedStock}
-                    setSelectedStock={setSelectedStock}
-                    onBuy={handleBuyFromWholesaler}
-                  />
-                )}
+                {/* ✅ Team Timer Display */}
+
+                {/* <div className="flex justify-center my-1 flex-shrink-0">
+                  <div className="bg-white rounded-lg px-4 py-1 shadow-md border border-[#A99065]">
+                    <span className="font-bold text-[#33552C]">
+                      ⏱️ Time Remaining: 
+                      <span className={`ml-2 ${parseInt(teamTimer) < 3 ? 'text-red-600 animate-pulse' : 'text-[#50704C]'}`}>
+                        {teamTimer}
+                      </span>
+                    </span>
+                    {myTeam?.isEliminated && (
+                      <span className="ml-4 text-red-600 font-bold">💀 ELIMINATED</span>
+                    )}
+                    {myTeam?.gameStatus === 'completed' && (
+                      <span className="ml-4 text-green-600 font-bold">✅ COMPLETED</span>
+                    )}
+                  </div>
+                </div> */}
+
+                {/* Tab Navigation */}
+                <div className="flex justify-center mb-1 flex-shrink-0">
+                  <div className="bg-white rounded-lg p-1 shadow-md flex">
+                    <button
+                      onClick={() => setActiveTab('global-auctions')}
+                      className={`px-4 py-1 rounded-md text-sm font-semibold transition-colors ${
+                        activeTab === 'global-auctions'
+                          ? 'bg-[#3A7D2C] text-white'
+                          : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      Global Auctions ({globalAuctions.length})
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('external-wholesaler')}
+                      className={`px-4 py-1 rounded-md text-sm font-semibold transition-colors ${
+                        activeTab === 'external-wholesaler'
+                          ? 'bg-[#3A7D2C] text-white'
+                          : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      External Wholesaler
+                    </button>
+                  </div>
+                                </div>
+
+                <div className="px-3 pb-2 text-center">
+                  <p className="inline-block rounded-md bg-white/90 px-3 py-1 text-[11px] font-medium text-[#5C4733] border border-[#D8C9AF]">
+                    Auction rule: winning team pays 100% of final bid. Seller receives 90%; 10% is marketplace service fee.
+                  </p>
+                </div>
+
+                <div className="flex-1 lg:min-h-0 lg:overflow-hidden">
+
+                  {activeTab === 'global-auctions' ? (
+                    <BrokerGlobalAuctionSelectedBox
+                      auctions={globalAuctions}
+                      selectedAuction={selectedAuction}
+                      setSelectedAuction={setSelectedAuction}
+                      currentUserId={user?._id}
+                      onPlaceBid={handlePlaceBid}
+                    />
+                  ) : (
+                    <BrokerExternalWholesalerSelectedBox
+                      key={externalStock.map((s) => s.materialType).join(',')}
+                      stock={externalStock}
+                      selectedStock={selectedStock}
+                      setSelectedStock={setSelectedStock}
+                      onBuy={handleBuyFromWholesaler}
+                    />
+                  )}
+                </div>
               </div>
             </div>
           </div>
-
-          {/* <div className="w-full xl:w-[26rem] xl:sticky xl:top-24 self-start max-h-[calc(100dvh-12rem)] overflow-y-auto pr-1">
-            {activeTab === 'global-auctions' ? (
-              selectedAuction ? (
-                <div className="bg-white/95 rounded-xl border border-[#C7B292] shadow-sm p-4 space-y-2">
-                  <h3 className="text-[15px] font-bold text-[#3f2c1b]">Selected Auction</h3>
-                  <p className="text-[12px] text-[#5c4733]"><span className="font-semibold">Material:</span> {selectedAuction.materialType}</p>
-                  <p className="text-[12px] text-[#5c4733]"><span className="font-semibold">Grade:</span> {selectedAuction.grade}</p>
-                  <p className="text-[12px] text-[#5c4733]"><span className="font-semibold">Mass:</span> {Number(selectedAuction.mass || 0).toFixed(1)}t</p>
-                  <p className="text-[12px] text-[#5c4733]"><span className="font-semibold">Current Bid:</span> ${Number(selectedAuction.currentBid || 0).toFixed(2)}</p>
-                  <button
-                    onClick={() => handlePlaceBid(selectedAuction.auctionId || selectedAuction.id)}
-                    className="w-full mt-2 rounded-md bg-[#3A7D2C] hover:bg-[#336f27] text-white text-sm font-semibold px-3 py-2"
-                  >
-                    Place Bid
-                  </button>
-                </div>
-              ) : null
-            ) : selectedStock ? (
-              <div className="bg-white/95 rounded-xl border border-[#C7B292] shadow-sm p-4 space-y-2">
-                <h3 className="text-[15px] font-bold text-[#3f2c1b]">Selected Stock</h3>
-                <p className="text-[12px] text-[#5c4733]"><span className="font-semibold">Material:</span> {selectedStock.materialType}</p>
-                <p className="text-[12px] text-[#5c4733]"><span className="font-semibold">Available:</span> {Number(selectedStock.availableMass || selectedStock.amount || 0).toFixed(1)}t</p>
-                <p className="text-[12px] text-[#5c4733]"><span className="font-semibold">Price/Ton:</span> ${Number(selectedStock.pricePerTon || 0).toFixed(2)}</p>
-              </div>
-            ) : null}
-          </div> */}
         </div>
-
-        {/* <SurrenderButton
-          playerId={user?._id ?? ''}
-          surrenderVotes={authoritativeState?.surrenderVotes ?? []}
-          canSurrender={(authoritativeState?.minutesElapsed ?? 0) >= 15}
-          onToggle={() => {
-            if (user?.currentSession) emit('surrender-toggle', { sessionId: user.currentSession });
-          }}
-        /> */}
       </div>
-
+            {/* <SurrenderButton
+        playerId={user?._id ?? ''}
+        surrenderVotes={myTeam?.surrenderVotes ?? []}
+        canSurrender={(myTeam?.minutesElapsed ?? 0) >= 15}
+        onToggle={() => {
+          if (user?.currentSession) emit('surrender-toggle', { sessionId: user.currentSession });
+        }}
+      /> */}
       <GameChatbot pageContext="broker-inventory" />
     </div>
   );

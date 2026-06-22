@@ -5,11 +5,11 @@
   "engines": {
     "node": ">=20.9.0"
   },
-  "scripts": {
+    "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx"
   },
   "dependencies": {
     "@nivo/core": "^0.99.0",

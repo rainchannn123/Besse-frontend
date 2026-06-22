@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import styles from './PairingQueue.module.css';
 
-interface PairingQueueProps {
+export interface PairingQueueProps {
   onJoinQueue: () => Promise<boolean>;
   isLoading: boolean;
   canJoinQueue?: boolean;

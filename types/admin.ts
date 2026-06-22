@@ -13,7 +13,8 @@ export interface AdminPlayerRow {
   userId: string;
   name: string;
   email: string;
-  accountRole: string;
+  accountRole?: string;
+  accountType?: string;
   currentSession: string | null;
   status: AdminPlayerStatus;
   hasActiveSocketConnections: boolean;

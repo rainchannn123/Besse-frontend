@@ -3,6 +3,7 @@ export interface User {
   email: string;
   name: string;
   role: string;
+  accountType?: 'student' | 'educator' | 'spectator' | 'admin';
   currentSession?: string | null;
 }
 

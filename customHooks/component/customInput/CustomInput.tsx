@@ -2,6 +2,7 @@
 import { Eye, EyeOff } from 'lucide-react';
 import React, { useState } from 'react';
 import { Control, useController } from 'react-hook-form';
+
 interface CustomInputProps {
   name: string;
   control: Control<any>;
@@ -38,8 +39,10 @@ const CustomInput: React.FC<CustomInputProps> = ({
     if (onChange) onChange(e.target.value);
   };
 
-  // Determine input type based on password visibility
   const inputType = type === 'password' && showPassword ? 'text' : type;
+
+  // FIX: Ensure value is always defined (never undefined)
+  const inputValue = field.value === undefined || field.value === null ? '' : field.value;
 
   return (
     <div className={`flex flex-col w-full min-w-0 mb-4 relative ${className || ''}`}>
@@ -50,6 +53,7 @@ const CustomInput: React.FC<CustomInputProps> = ({
       <div className="relative w-full min-w-0">
         <input
           {...field}
+          value={inputValue}
           type={inputType}
           placeholder={placeholder}
           onChange={handleChange}

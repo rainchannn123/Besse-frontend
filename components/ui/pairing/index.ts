@@ -4,4 +4,4 @@ export { PairingStatus } from './PairingStatus';
 export { PairingWaitingRoom } from './PairingWaitingRoom';
 
 // Export types
-export type { default as PairingQueueProps } from './PairingQueue';
+export type { PairingQueueProps } from './PairingQueue';

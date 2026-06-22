@@ -10,7 +10,7 @@ import { useWebSocket } from '@/hooks/useWebSocket';
 import { gameService } from '@/services/gameService';
 import { useAuthStore } from '@/stores/authStore';
 import { useNotificationStore } from '@/stores/notificationStore';
-import { GameState, PlayerRole } from '@/types/besse';
+import { GameState, TeamData, PlayerRole } from '@/types/besse';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
@@ -19,125 +19,152 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname();
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [gameState, setGameState] = useState<GameState | null>(null);
+  const [myTeam, setMyTeam] = useState<TeamData | null>(null);
 
   const { isAuthenticated, isLoading, initializeAuth, user } = useAuthStore();
   const { notifications, removeNotification } = useNotificationStore();
 
-  // Initialize WebSocket connection for authenticated dashboard users
+  // ✅ Skip WebSocket and auth for admin game room
+  const isAdminGameRoom = pathname?.startsWith('/dashboard/admin-game-room/');
+  
   const { subscribe, isConnected, joinGame } = useWebSocket();
 
   useEffect(() => {
-    // Initialize auth if not already initialized
     if (isLoading === true) {
       initializeAuth();
     }
   }, [isLoading, initializeAuth]);
 
+  // ✅ FIXED: Skip auth check for admin game room
   useEffect(() => {
-    // Check authentication status
     if (!isLoading) {
-      if (!isAuthenticated) {
-        // Redirect to login if not authenticated
+      if (!isAdminGameRoom && !isAuthenticated) {
         router.push('/auth/login');
       } else {
-        // Allow access if authenticated
         setIsCheckingAuth(false);
       }
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [isAuthenticated, isLoading, router, isAdminGameRoom]);
 
-  // Pages where an active GameSession exists (post-lobby)
+  // ✅ Skip WebSocket connection for admin game room
+  useEffect(() => {
+    if (isAdminGameRoom) {
+      return;
+    }
+    
+    if (user?.currentSession && isConnected && !isAdminGameRoom) {
+      joinGame(user.currentSession);
+    }
+  }, [user?.currentSession, isConnected, joinGame, isAdminGameRoom]);
+
+  // ✅ Pages where a game actually exists (not lobby/role selection)
   const isGamePage = pathname === '/dashboard/municipality'
     || pathname === '/dashboard/mrf-collection'
     || pathname === '/dashboard/broker-inventory'
-    || pathname === '/dashboard/game-over';
+    || pathname === '/dashboard/game-over'
+    || pathname === '/dashboard/game-room/[roomCode]'
+    || pathname.startsWith('/dashboard/game-room/');
 
-  // Fetch game state only on actual game pages
+  // ✅ Pages where user is in lobby/pre-game (don't fetch game state)
+  const isPreGamePage = pathname === '/dashboard/besse-group'
+    || pathname === '/dashboard/team-members'
+    || pathname === '/dashboard/role'
+    || pathname === '/dashboard/matchmaking-lobby'
+    || pathname === '/dashboard/pairing'
+    || pathname === '/dashboard/game-mode'
+    || pathname.startsWith('/dashboard/waiting-room/')
+    || isAdminGameRoom;
+
+  // ✅ Only fetch game state on actual game pages
   useEffect(() => {
-    if (user?.currentSession && isAuthenticated && isGamePage) {
+    if (user?.currentSession && isAuthenticated && isGamePage && !isPreGamePage && !isAdminGameRoom) {
       const fetchGameState = async () => {
         try {
           const response = await gameService.getGameState(user.currentSession!);
           if (response.success && response.data) {
             setGameState(response.data.gameState);
+            
+            const currentTeam = response.data.gameState.teams?.find(
+              (team: TeamData) => team.sessionId === user.currentSession
+            );
+            if (currentTeam) {
+              setMyTeam(currentTeam);
+            }
           }
         } catch (error) {
-          console.error('Failed to fetch game state:', error);
+          console.debug('No active game session yet');
         }
       };
       fetchGameState();
+    } else {
+      setGameState(null);
+      setMyTeam(null);
     }
-  }, [pathname, user?.currentSession, isAuthenticated, isGamePage]);
+  }, [pathname, user?.currentSession, isAuthenticated, isGamePage, isPreGamePage, isAdminGameRoom]);
 
-  // Subscribe to realtime updates for header/footer data on ALL authenticated pages
+  // ✅ Subscribe to realtime updates for header/footer data on ALL authenticated pages
   useEffect(() => {
-    if (!isAuthenticated || !user) return;
+    if (!isAuthenticated || !user || isAdminGameRoom) return;
 
-    // Join the game room only on pages where a game actually exists
     if (isConnected && user.currentSession && isGamePage) {
       joinGame(user.currentSession);
     }
 
-    // Game state updates - core game state changes
-    const unsubGameStateUpdate = subscribe('game-state-update', (payload: any) => {
-      if (payload?.gameState) {
-        setGameState(payload.gameState);
-        // Check if game is over and redirect
-        if (
-          payload.gameState.gameStatus === 'complete' ||
-          payload.gameState.gameStatus === 'lost' ||
-          payload.gameState.gameStatus === 'won'
-        ) {
-          router.push('/dashboard/game-over');
-        }
+        const handleRealtimeGamePayload = (payload: any) => {
+      if (!payload?.gameState) return;
+
+      setGameState(payload.gameState);
+
+      const currentTeam = payload.gameState.teams?.find(
+        (team: TeamData) => team.sessionId === user?.currentSession
+      );
+      if (currentTeam) {
+        setMyTeam(currentTeam);
       }
-    });
 
-    // Full game state with computed extras (authoritative source)
-    const unsubGameStateFull = subscribe('game-state-full', (payload: any) => {
-      if (payload?.gameState) {
-        setGameState(payload.gameState);
-        // Check if game is over and redirect
-        if (
-          payload.gameState.gameStatus === 'complete' ||
-          payload.gameState.gameStatus === 'lost' ||
-          payload.gameState.gameStatus === 'won'
-        ) {
-          router.push('/dashboard/game-over');
-        }
+      if (
+        payload.gameState.gameStatus === 'complete' ||
+        payload.gameState.gameStatus === 'lost' ||
+        payload.gameState.gameStatus === 'won'
+      ) {
+        router.push('/dashboard/game-over');
       }
-    });
+    };
 
-    // System check updates (30s interval) - keeps header/footer data current
-    const unsubSystemCheckUpdate = subscribe('system-check-update', (payload: any) => {
-      if (payload?.gameState) {
-        setGameState(payload.gameState);
+    const unsubGameStateUpdate = subscribe('game-state-update', handleRealtimeGamePayload);
+    const unsubGameStateUpdated = subscribe('game-state-updated', handleRealtimeGamePayload);
+    const unsubGameStateFull = subscribe('game-state-full', handleRealtimeGamePayload);
+    const unsubSystemCheckUpdate = subscribe('system-check-update', handleRealtimeGamePayload);
 
-        if (
-          payload.gameState.gameStatus === 'complete' ||
-          payload.gameState.gameStatus === 'lost' ||
-          payload.gameState.gameStatus === 'won'
-        ) {
-          router.push('/dashboard/game-over');
-        }
+
+    const unsubPlayerAction = subscribe('player-action', (payload: any) => {});
+
+    const unsubTeamEliminated = subscribe('team-eliminated', (payload: any) => {
+      if (payload?.teamId && myTeam?.teamId === payload.teamId) {
+                setMyTeam((prev: TeamData | null) =>
+          prev
+            ? {
+                ...prev,
+                isEliminated: true,
+                gameStatus: 'eliminated',
+                eliminationReason: payload.reason,
+              }
+            : null
+        );
       }
-    });
-
-    // Player actions - may affect game state indirectly
-    const unsubPlayerAction = subscribe('player-action', (payload: any) => {
-      // Player actions might not directly change game state but could trigger updates
-      // The system-check-update will keep everything synchronized
     });
 
     return () => {
-      unsubGameStateUpdate && unsubGameStateUpdate();
+            unsubGameStateUpdate && unsubGameStateUpdate();
+      unsubGameStateUpdated && unsubGameStateUpdated();
       unsubGameStateFull && unsubGameStateFull();
       unsubSystemCheckUpdate && unsubSystemCheckUpdate();
-      unsubPlayerAction && unsubPlayerAction();
-    };
-  }, [isAuthenticated, user, isConnected, isGamePage, subscribe, joinGame, router]);
 
-  // Show loading while checking authentication
+      unsubPlayerAction && unsubPlayerAction();
+      unsubTeamEliminated && unsubTeamEliminated();
+    };
+  }, [isAuthenticated, user, isConnected, isGamePage, subscribe, joinGame, router, myTeam?.teamId, isAdminGameRoom]);
+
   if (isLoading || isCheckingAuth) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -147,51 +174,81 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </div>
     );
   }
-  // If authenticated, render the dashboard content
+
+    const isGameOverPage = pathname === '/dashboard/game-over';
+
+  // ✅ Check if we should show municipality header/footer
   const isMunicipalityPage =
     pathname === '/dashboard/municipality' ||
     pathname === '/dashboard/mrf-collection' ||
-    pathname === '/dashboard/broker-inventory';
+    pathname === '/dashboard/broker-inventory' ||
+    pathname === '/dashboard/matchmaking-lobby' ||
+    pathname.startsWith('/dashboard/game-room/');
 
-  const userRole =
-    gameState && user
-      ? Object.keys(gameState.players).find(
-          (role: string) => gameState.players[role as PlayerRole] === user._id
-        )
-      : null;
 
-  return (
-    <div className={isMunicipalityPage && gameState ? "min-h-screen lg:h-screen bg-gray-50 flex flex-col relative lg:overflow-hidden" : "min-h-screen bg-gray-50 flex flex-col relative"}>
+  const userRole = myTeam && user
+    ? Object.keys(myTeam.players).find(
+        (role: string) => myTeam.players[role as PlayerRole] === user._id
+      )
+    : null;
+
+  // ✅ Only show Municipality header/footer if we have game state
+  const showMunicipalityUI = isMunicipalityPage && gameState !== null && !isAdminGameRoom;
+
+    return (
+    <div className={showMunicipalityUI ? "min-h-screen lg:h-screen bg-gray-50 flex flex-col relative lg:overflow-hidden" : "min-h-screen bg-gray-50 flex flex-col relative"}>
       <UserLogoutButton />
-      {isMunicipalityPage && gameState ? (
-        <MunicipalityHeader
-          playerName={user?.name}
-          role={userRole || ''}
-          cityName={(gameState as any).cityName || 'Clash of the Cities - Mission Net Zero'}
-          wasteInventory={(gameState as any).wasteInventory || 0}
-          maxCapacity={(gameState as any).maxCapacity || 150}
-        />
-      ) : (
-        <Header />
+
+      {!isGameOverPage && (
+        showMunicipalityUI ? (
+          <MunicipalityHeader
+            playerName={user?.name}
+            role={userRole || ''}
+            cityName={myTeam?.teamName || 'BESSE City'}
+            wasteInventory={myTeam?.wasteInventory || 0}
+            maxCapacity={150}
+          />
+        ) : (
+          <Header />
+        )
       )}
-      <main className={isMunicipalityPage && gameState ? "flex-1 lg:min-h-0 bgColor lg:overflow-hidden py-3" : "flex-1 bgColor"}>{children}</main>
+
+      <main className={showMunicipalityUI ? "flex-1 lg:min-h-0 bgColor lg:overflow-hidden py-3" : "flex-1 bgColor"}>{children}</main>
 
       <NotificationCenter
         notifications={notifications}
         onDismiss={removeNotification}
       />
-      {isMunicipalityPage && gameState ? (
-        <MunicipalityFooter
-          budget={gameState.budget}
-          cityHealth={gameState.cityHealth}
-          wasteInventory={(gameState as any).wasteInventory || 0}
-          maxCapacity={(gameState as any).maxCapacity || 150}
-          totalCO2={gameState.totalCO2}
-          teamScore={(gameState as any).teamScore || 0}
-          maxTeamScore={(gameState as any).maxTeamScore || 0}
-        />
-      ) : (
-        <Footer />
+
+      {!isGameOverPage && (
+        showMunicipalityUI ? (
+          <MunicipalityFooter
+            budget={myTeam?.budget || 0}
+            cityHealth={myTeam?.cityHealth || 0}
+            wasteInventory={myTeam?.wasteInventory || 0}
+            maxCapacity={150}
+            totalCO2={myTeam?.totalCO2 || 0}
+            teamScore={
+              myTeam?.totalProjectScore ??
+              myTeam?.teamScore ??
+              myTeam?.cityProjects?.filter((project) => project.completed).reduce(
+                (sum, project) => sum + Number(project.score ?? project.scoreBonus ?? 0),
+                0
+              ) ??
+              0
+            }
+            maxTeamScore={
+              myTeam?.maxTeamScore ||
+              myTeam?.cityProjects?.reduce(
+                (sum, project) => sum + Number(project.score ?? project.scoreBonus ?? 0),
+                0
+              ) ||
+              0
+            }
+          />
+        ) : (
+          <Footer />
+        )
       )}
     </div>
   );

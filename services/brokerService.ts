@@ -15,8 +15,10 @@ import {
 } from '../types/besse';
 
 export const brokerService = {
-  async getActiveAuctions(sessionId: string): Promise<ActiveAuctionsResponse> {
-    const response = await api.get<ActiveAuctionsResponse>(`/broker/auctions`);
+    async getActiveAuctions(sessionId: string): Promise<ActiveAuctionsResponse> {
+    const response = await api.get<ActiveAuctionsResponse>(`/broker/auctions`, {
+      params: { sessionId },
+    });
     return response.data;
   },
 

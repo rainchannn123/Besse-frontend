@@ -4,7 +4,8 @@ export type QualityGrade = 'A' | 'B' | 'C' | 'F';
 export type PlayerRole = 'municipality' | 'mrf' | 'broker';
 export type WasteOrigin = 'Residential' | 'Commercial' | 'Industrial';
 export type BatchStatus = 'PENDING' | 'DELIVERED' | 'FAILED';
-export type GameStatus = 'active' | 'won' | 'lost' | 'complete';
+export type GameStatus = 'active' | 'won' | 'lost' | 'complete' | 'completed' | 'eliminated';
+export type TeamStatus = 'active' | 'eliminated' | 'completed';
 
 // User Types
 export interface IUser {
@@ -114,9 +115,11 @@ export interface GameConstants {
   COUNTDOWN_RECOVERY_BUDGET_THRESHOLD: number; // $1,000
 
   // Auction and Broker settings
-  AUCTION_DURATION_SECONDS: number; // 30 seconds
+    AUCTION_DURATION_SECONDS: number; // 30 seconds
+  AUCTION_BID_INCREMENT_RATE?: number;
   PLAYER_BID_CAP: number; // 10 active bids
   MARKUP_CONSTANT: number; // 2.5x
+  TEAM_GAME_DURATION_MINUTES?: number;
 
   // Penalties
   REFUSE_HEALTH_PENALTY_PER_TON: number; // 0.5% per ton
@@ -129,6 +132,7 @@ export interface Auction {
   grade: 'A' | 'B' | 'C' | 'F';
   mass: number;
   currentBid: number; // Current/highest bid amount (starts as entry price set by MRF)
+  entryPrice?: number;
   startingPrice?: number; // Entry price set by MRF (for reference, same as initial currentBid)
   highBidder: string | null; // playerId of highest bidder
   highBidderSessionId?: string | null; // sessionId of highest bidder's team (for self-win detection)
@@ -423,9 +427,92 @@ export interface Transaction {
   revenue: number;
 }
 
+export interface TeamData {
+  teamId: string;
+  sessionId: string;
+  citySlot: number;
+  teamName: string;
+  players: {
+    municipality: string;
+    mrf: string;
+    broker: string;
+  };
+  playerNames: {
+    municipality: string;
+    mrf: string;
+    broker: string;
+  };
+  budget: number;
+  cityHealth: number;
+  totalCO2: number;
+  wasteInventory: number;
+  totalTransportTrips: number;
+  totalLandfillTons: number;
+  maxTeamScore: number;
+  teamStartTime: number;
+  minutesElapsed: number;
+  gameStatus: TeamStatus;
+  cityProjects: CityProject[];
+  municipalInventory: {
+    paper: number;
+    plastic: number;
+    metal: number;
+    glass: number;
+    wood: number;
+  };
+  wasteBatches: WasteBatch[];
+  mrfQueue: MRFQueue[];
+  materialInventory: Material[];
+  transactions: Transaction[];
+  activityLog: string[];
+  activeLocks: {
+    [key: string]: {
+      playerId: string;
+      timestamp: number;
+      type: 'batch' | 'queue' | 'material';
+    };
+  };
+  gameOverCountdown: {
+    active: boolean;
+    startTime: number | null;
+    reason: 'health' | 'budget' | 'time' | null;
+  };
+  surrenderVotes: string[];
+  marketplaceListing: Auction[];
+  externalStock: {
+    paper: number;
+    plastic: number;
+    metal: number;
+    glass: number;
+    wood: number;
+  };
+  activeBids: {
+    [playerId: string]: number;
+  };
+  activeTransports?: ActiveTransport[];
+  totalProjectScore?: number;
+  isEliminated?: boolean;
+  eliminationReason?: 'health' | 'budget' | 'time' | null;
+  teamScore?: number;
+}
+
+export interface ActiveTransport {
+  id: string;
+  batchId: string;
+  wasteBatch: WasteBatch;
+  mode: 'fast' | 'slow';
+  startTime: number;
+  endTime: number;
+  cost: number;
+  co2Emission: number;
+  status: 'in-transit' | 'completed';
+}
+
 // Game Types
 export interface GameState {
   sessionId: string;
+  roomCode?: string;
+  teams: TeamData[];
   currentTurn: number;
   budget: number;
   cityHealth: number;
@@ -643,7 +730,7 @@ export interface CityProject {
   id: string;
   name: string;
   description?: string;
-  requiredMaterials?: Partial<Record<MaterialType, number>>;
+  requiredMaterials: Partial<Record<MaterialType, number>>;
   addedMaterials?: Partial<Record<MaterialType, number>>;
   progress: number;
   completed: boolean;
@@ -651,8 +738,9 @@ export interface CityProject {
   budgetBonus: number;
   scoreBonus: number;
   difficultyScore?: number;
-  estimatedExternalCost?: number;
+    estimatedExternalCost?: number;
   deadline: number;
+  score?: number;
 }
 
 export interface CityProjectsResponse
