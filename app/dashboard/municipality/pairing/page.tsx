@@ -288,10 +288,11 @@ export default function PairingDashboardPage() {
                 <Users size={24} />
                 Available Waiting Rooms
               </h2>
-              <AvailableRoomsTable
+                            <AvailableRoomsTable
                 rooms={availableRooms}
                 onJoinRoom={handleJoinRoom}
                 isLoading={isLoading}
+                isLeader={true}
               />
             </div>
           </div>

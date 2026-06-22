@@ -329,9 +329,6 @@ export default function AdminMonitorPage() {
       message: 'Admin authorization required',
       type: 'error',
     });
-    router.push('/auth/login');
-    return;
-    
 
     try {
       setActionLoadingUserId(player.userId);
@@ -443,7 +440,7 @@ export default function AdminMonitorPage() {
                     Creating...
                   </span>
                 ) : (
-                  '🏠 Create Room'
+                  'Create Admin Game Room'
                 )}
               </button>
               <button

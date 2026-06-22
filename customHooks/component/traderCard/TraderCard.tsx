@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import trade from "@/public/assets/images/trade.png";
 import trade2 from "@/public/assets/images/trade2.png";
-import Image from "next/image";
+import Image, { StaticImageData } from "next/image";
 import TraderCardModal from "./TraderCardModal";
 // import { MarketPlaceFooter } from "@/components/layout/footer/MarketPlaceFooter";
 interface MaterialOffer {
@@ -12,7 +12,7 @@ interface MaterialOffer {
   subtitle: string;
   material: string;
   imageAlt: string;
-  imageSrc: string;
+  imageSrc: StaticImageData;
   quantity: number;
   unit: string;
   time: string;

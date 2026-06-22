@@ -18,25 +18,15 @@ interface TransportProgressListProps {
 }
 
 const TransportProgressList: React.FC<TransportProgressListProps> = ({ transports }) => {
-  const [timeRemaining, setTimeRemaining] = React.useState<Record<string, number>>({});
+  const [now, setNow] = React.useState(() => Date.now());
 
   React.useEffect(() => {
-    const updateTimes = () => {
-      const now = Date.now();
-      const newTimes: Record<string, number> = {};
+    const interval = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
 
-      transports.forEach((transport) => {
-        const remaining = Math.max(0, Math.ceil((transport.endTime - now) / 1000));
-        newTimes[transport.id] = remaining;
-      });
-
-      setTimeRemaining(newTimes);
-    };
-
-    updateTimes();
-    const interval = setInterval(updateTimes, 1000);
     return () => clearInterval(interval);
-  }, [transports]);
+  }, []);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -49,10 +39,13 @@ const TransportProgressList: React.FC<TransportProgressListProps> = ({ transport
   return (
     <div className="space-y-1.5">
       {transports.map((transport) => {
-        const remaining = timeRemaining[transport.id] || 0;
         const isFast = transport.mode === 'fast';
+        const modeLabel = isFast ? 'Fast Transport' : 'Slow Transport';
         const totalDuration = isFast ? 30 : 60;
-        const progress = totalDuration > 0 ? ((totalDuration - remaining) / totalDuration) * 100 : 0;
+        const remaining = Math.max(0, Math.ceil((transport.endTime - now) / 1000));
+
+        // Countdown-style bar: starts full, then shrinks right-to-left.
+        const progress = totalDuration > 0 ? (remaining / totalDuration) * 100 : 0;
 
         return (
           <div key={transport.id} className="flex items-center gap-2 h-6">
@@ -63,10 +56,18 @@ const TransportProgressList: React.FC<TransportProgressListProps> = ({ transport
               <Clock className="h-3.5 w-3.5 text-green-600 shrink-0" />
             )}
 
+            <span
+              className={`text-[10px] font-semibold uppercase tracking-wide shrink-0 ${
+                isFast ? 'text-orange-600' : 'text-green-700'
+              }`}
+            >
+              {modeLabel}
+            </span>
+
             {/* Single slim animated progress bar */}
             <div className="relative flex-1 h-1.5 rounded-full bg-gray-200 overflow-hidden">
               <div
-                className={`h-full rounded-full transition-all duration-1000 ease-linear ${
+                className={`ml-auto h-full rounded-full transition-all duration-1000 ease-linear ${
                   isFast ? 'bg-orange-500' : 'bg-green-500'
                 }`}
                 style={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
@@ -83,5 +84,6 @@ const TransportProgressList: React.FC<TransportProgressListProps> = ({ transport
     </div>
   );
 };
+
 
 export default TransportProgressList;

@@ -177,9 +177,6 @@ export const MaterialConstructAction: React.FC<MaterialConstructActionProps> = (
 
           {isValidMaterialType && (
             <div className="mb-4">
-              <label className="block text-sm font-medium mb-2">
-                Material Amount (tons) - Available: {availableAmount.toFixed(2)}t, Needed: {remainingRequired.toFixed(2)}t
-              </label>
 
               <div className="mb-3 flex items-center gap-2">
                 <input
@@ -199,7 +196,7 @@ export const MaterialConstructAction: React.FC<MaterialConstructActionProps> = (
                   className="w-4 h-4 cursor-pointer"
                 />
                 <label htmlFor="contributeFull" className="text-sm text-gray-700 cursor-pointer">
-                  Contribute full available amount
+                  Contribute all available amount
                 </label>
               </div>
 
@@ -220,12 +217,9 @@ export const MaterialConstructAction: React.FC<MaterialConstructActionProps> = (
                     }
                   }
                 }}
-                placeholder={`Max: ${Math.min(availableAmount, remainingRequired).toFixed(2)}t`}
+                placeholder={`Max: ${Math.min(availableAmount, remainingRequired).toFixed(2)} tonnes`}
                 className="w-full p-2 border border-gray-300 rounded-md"
               />
-              <p className="text-xs text-gray-600 mt-1">
-                Enter the amount to contribute (max: {Math.min(availableAmount, remainingRequired).toFixed(2)}t)
-              </p>
               {materialAmount > 0 && (
                 <p className="text-xs text-orange-600 mt-1">
                   ⚠ CO₂ to be emitted: {co2Emission.toFixed(2)} tons

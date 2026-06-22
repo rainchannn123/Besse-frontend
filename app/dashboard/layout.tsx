@@ -110,86 +110,56 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       joinGame(user.currentSession);
     }
 
-    const unsubGameStateUpdate = subscribe('game-state-update', (payload: any) => {
-      if (payload?.gameState) {
-        setGameState(payload.gameState);
-        
-        const currentTeam = payload.gameState.teams?.find(
-          (team: TeamData) => team.sessionId === user?.currentSession
-        );
-        if (currentTeam) {
-          setMyTeam(currentTeam);
-        }
-        
-        if (
-          payload.gameState.gameStatus === 'complete' ||
-          payload.gameState.gameStatus === 'lost' ||
-          payload.gameState.gameStatus === 'won'
-        ) {
-          router.push('/dashboard/game-over');
-        }
-      }
-    });
+        const handleRealtimeGamePayload = (payload: any) => {
+      if (!payload?.gameState) return;
 
-    const unsubGameStateFull = subscribe('game-state-full', (payload: any) => {
-      if (payload?.gameState) {
-        setGameState(payload.gameState);
-        
-        const currentTeam = payload.gameState.teams?.find(
-          (team: TeamData) => team.sessionId === user?.currentSession
-        );
-        if (currentTeam) {
-          setMyTeam(currentTeam);
-        }
-        
-        if (
-          payload.gameState.gameStatus === 'complete' ||
-          payload.gameState.gameStatus === 'lost' ||
-          payload.gameState.gameStatus === 'won'
-        ) {
-          router.push('/dashboard/game-over');
-        }
-      }
-    });
+      setGameState(payload.gameState);
 
-    const unsubSystemCheckUpdate = subscribe('system-check-update', (payload: any) => {
-      if (payload?.gameState) {
-        setGameState(payload.gameState);
-        
-        const currentTeam = payload.gameState.teams?.find(
-          (team: TeamData) => team.sessionId === user?.currentSession
-        );
-        if (currentTeam) {
-          setMyTeam(currentTeam);
-        }
-
-        if (
-          payload.gameState.gameStatus === 'complete' ||
-          payload.gameState.gameStatus === 'lost' ||
-          payload.gameState.gameStatus === 'won'
-        ) {
-          router.push('/dashboard/game-over');
-        }
+      const currentTeam = payload.gameState.teams?.find(
+        (team: TeamData) => team.sessionId === user?.currentSession
+      );
+      if (currentTeam) {
+        setMyTeam(currentTeam);
       }
-    });
+
+      if (
+        payload.gameState.gameStatus === 'complete' ||
+        payload.gameState.gameStatus === 'lost' ||
+        payload.gameState.gameStatus === 'won'
+      ) {
+        router.push('/dashboard/game-over');
+      }
+    };
+
+    const unsubGameStateUpdate = subscribe('game-state-update', handleRealtimeGamePayload);
+    const unsubGameStateUpdated = subscribe('game-state-updated', handleRealtimeGamePayload);
+    const unsubGameStateFull = subscribe('game-state-full', handleRealtimeGamePayload);
+    const unsubSystemCheckUpdate = subscribe('system-check-update', handleRealtimeGamePayload);
+
 
     const unsubPlayerAction = subscribe('player-action', (payload: any) => {});
 
     const unsubTeamEliminated = subscribe('team-eliminated', (payload: any) => {
       if (payload?.teamId && myTeam?.teamId === payload.teamId) {
-        setMyTeam((prev) => prev ? {
-          ...prev,
-          isEliminated: true,
-          gameStatus: 'eliminated',
-          eliminationReason: payload.reason,
-        } : null);
+                setMyTeam((prev: TeamData | null) =>
+          prev
+            ? {
+                ...prev,
+                isEliminated: true,
+                gameStatus: 'eliminated',
+                eliminationReason: payload.reason,
+              }
+            : null
+        );
       }
     });
 
     return () => {
-      unsubGameStateUpdate && unsubGameStateUpdate();
+            unsubGameStateUpdate && unsubGameStateUpdate();
+      unsubGameStateUpdated && unsubGameStateUpdated();
       unsubGameStateFull && unsubGameStateFull();
       unsubSystemCheckUpdate && unsubSystemCheckUpdate();
+
       unsubPlayerAction && unsubPlayerAction();
       unsubTeamEliminated && unsubTeamEliminated();
     };
@@ -205,14 +175,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     );
   }
 
+    const isGameOverPage = pathname === '/dashboard/game-over';
+
   // ✅ Check if we should show municipality header/footer
   const isMunicipalityPage =
     pathname === '/dashboard/municipality' ||
     pathname === '/dashboard/mrf-collection' ||
     pathname === '/dashboard/broker-inventory' ||
-    pathname === '/dashboard/game-over' ||
     pathname === '/dashboard/matchmaking-lobby' ||
     pathname.startsWith('/dashboard/game-room/');
+
 
   const userRole = myTeam && user
     ? Object.keys(myTeam.players).find(
@@ -223,39 +195,60 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // ✅ Only show Municipality header/footer if we have game state
   const showMunicipalityUI = isMunicipalityPage && gameState !== null && !isAdminGameRoom;
 
-  return (
+    return (
     <div className={showMunicipalityUI ? "min-h-screen lg:h-screen bg-gray-50 flex flex-col relative lg:overflow-hidden" : "min-h-screen bg-gray-50 flex flex-col relative"}>
       <UserLogoutButton />
-      {showMunicipalityUI ? (
-        <MunicipalityHeader
-          playerName={user?.name}
-          role={userRole || ''}
-          cityName={myTeam?.teamName || 'BESSE City'}
-          wasteInventory={myTeam?.wasteInventory || 0}
-          maxCapacity={150}
-        />
-      ) : (
-        <Header />
+
+      {!isGameOverPage && (
+        showMunicipalityUI ? (
+          <MunicipalityHeader
+            playerName={user?.name}
+            role={userRole || ''}
+            cityName={myTeam?.teamName || 'BESSE City'}
+            wasteInventory={myTeam?.wasteInventory || 0}
+            maxCapacity={150}
+          />
+        ) : (
+          <Header />
+        )
       )}
+
       <main className={showMunicipalityUI ? "flex-1 lg:min-h-0 bgColor lg:overflow-hidden py-3" : "flex-1 bgColor"}>{children}</main>
 
       <NotificationCenter
         notifications={notifications}
         onDismiss={removeNotification}
       />
-      {showMunicipalityUI ? (
-        <MunicipalityFooter
-          budget={myTeam?.budget || 0}
-          cityHealth={myTeam?.cityHealth || 0}
-          wasteInventory={myTeam?.wasteInventory || 0}
-          maxCapacity={150}
-          totalCO2={myTeam?.totalCO2 || 0}
-          //added below
-          teamScore={myTeam?.teamScore || 0}
-          maxTeamScore={myTeam?.maxTeamScore || 0}
-        />
-      ) : (
-        <Footer />
+
+      {!isGameOverPage && (
+        showMunicipalityUI ? (
+          <MunicipalityFooter
+            budget={myTeam?.budget || 0}
+            cityHealth={myTeam?.cityHealth || 0}
+            wasteInventory={myTeam?.wasteInventory || 0}
+            maxCapacity={150}
+            totalCO2={myTeam?.totalCO2 || 0}
+            teamScore={
+              myTeam?.totalProjectScore ??
+              myTeam?.teamScore ??
+              myTeam?.cityProjects?.filter((project) => project.completed).reduce(
+                (sum, project) => sum + Number(project.score ?? project.scoreBonus ?? 0),
+                0
+              ) ??
+              0
+            }
+            maxTeamScore={
+              myTeam?.maxTeamScore ||
+              myTeam?.cityProjects?.reduce(
+                (sum, project) => sum + Number(project.score ?? project.scoreBonus ?? 0),
+                0
+              ) ||
+              0
+            }
+          />
+        ) : (
+          <Footer />
+        )
       )}
     </div>
   );

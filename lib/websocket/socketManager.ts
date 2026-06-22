@@ -8,8 +8,10 @@ export type GameEvent =
   | 'disconnected'
   | 'connection_error'
   | 'joined-game'
-  | 'game-state-update'
+    | 'game-state-update'
+  | 'game-state-updated'
   | 'game-state-full'
+
   | 'lobby-state-update'
   | 'waste-collected'
   | 'waste-rejected'
@@ -67,6 +69,7 @@ class SocketManager {
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
+  private isConnecting = false;
 
   // Store event listeners for the pub/sub pattern
   private eventListeners: Map<string, Set<SocketCallback>> = new Map();
@@ -76,9 +79,13 @@ class SocketManager {
   private lastJoinedSession: string | null = null;
   private lastJoinedSocketId: string | null = null;
 
-  connect(): void {
-    if (this.socket?.connected) {
-      // console.log('Socket already connected');
+    connect(): void {
+    if (this.socket?.connected || this.isConnecting) {
+      return;
+    }
+
+    // If socket instance already exists (connecting/reconnecting), don't create another one.
+    if (this.socket) {
       return;
     }
 
@@ -100,6 +107,8 @@ class SocketManager {
     }
 
     // console.log('Attempting to connect to socket:', socketUrl);
+
+        this.isConnecting = true;
 
     this.socket = io(socketUrl, {
       auth: {
@@ -124,10 +133,13 @@ class SocketManager {
       this.persistGameSession(null);
     }
 
-    if (this.socket) {
+        if (this.socket) {
+      this.socket.removeAllListeners();
       this.socket.disconnect();
       this.socket = null;
     }
+
+    this.isConnecting = false;
 
     // Clear all event listeners
     this.eventListeners.clear();
@@ -286,9 +298,10 @@ class SocketManager {
     if (!this.socket) return;
 
     // Connection events
-    this.socket.on('connect', () => {
+        this.socket.on('connect', () => {
       // console.log('[SocketManager] WebSocket CONNECTED, socket id:', this.socket?.id);
       this.reconnectAttempts = 0; // Reset counter on successful connect
+      this.isConnecting = false;
       this.emitEvent('connected');
 
       // Ensure we have the latest session from localStorage
@@ -311,16 +324,18 @@ class SocketManager {
       }
     });
 
-    this.socket.on('disconnect', (reason: any) => {
+        this.socket.on('disconnect', (reason: any) => {
       // console.log('WebSocket disconnected:', reason);
       this.lastJoinedSession = null;
       this.lastJoinedSocketId = null;
+      this.isConnecting = false;
       this.emitEvent('disconnected');
       this.handleReconnect();
     });
 
-    this.socket.on('connect_error', (error: any) => {
+        this.socket.on('connect_error', (error: any) => {
       console.error('WebSocket connection error:', error);
+      this.isConnecting = false;
       this.emitEvent('connection_error', error);
       this.handleReconnect();
     });

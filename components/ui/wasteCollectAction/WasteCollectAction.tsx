@@ -82,7 +82,7 @@ export const WasteCollectAction: React.FC<WasteCollectActionProps> = ({
         </h3>
         <div className="h-0.5 mx-4 bg-[#A99065] mb-3"></div>
 
-        <div className="flex justify-center gap-4 mt-6">
+        {/* <div className="flex justify-center gap-4 mt-6">
           <Image src={paper} alt="paper" />
           <h4 className="2xl:text-[35px] xl:text-[28px] lg:text-[35px] text-[35px] font-bold text-black mb-1 font-roboto">
             {selectedBatch ? `${selectedBatch.origin} Waste` : 'Select a Batch'}
@@ -93,7 +93,7 @@ export const WasteCollectAction: React.FC<WasteCollectActionProps> = ({
           <p className="2xl:text-[25px] xl:text-[20px] lg:text-[25px] text-[25px] font-bold text-black font-roboto">
             Mass: {selectedBatch ? `${Number(selectedBatch.mass).toFixed(2)}t` : '0.00t'}
           </p>
-        </div>
+        </div> */}
 
         {selectedBatch && (
           <div className="mb-4 p-3 bg-gray-50 rounded-lg">
@@ -215,7 +215,7 @@ export const WasteCollectAction: React.FC<WasteCollectActionProps> = ({
         )}
       </div>
 
-      <div>
+      {/* <div>
         <h2 className="text-center mt-4 mb-2 font-roboto font-bold 2xl:text-[25px] xl:text-[20px] md:text-[25px] text-[25px] text-black">
           Truck Fleet
         </h2>
@@ -227,7 +227,7 @@ export const WasteCollectAction: React.FC<WasteCollectActionProps> = ({
             <Image src={littleTrack} alt="littleTrack" className="w-10 h-6" />
           </div>
         </div>
-      </div>
+      </div> */}
     </div>
   );
 };

@@ -7,6 +7,8 @@ import { BrokerGlobalAuctionSelectedBox } from '@/components/ui/selectedBox/Brok
 import ShiftLog from '@/components/ui/shiftLog/ShiftLog';
 import { SurrenderButton } from '@/components/ui/surrenderButton/SurrenderButton';
 import GameChatbot from '@/components/ui/chatbot/GameChatbot';
+import LiveTeamRankingToggle from '@/components/ui/LiveTeamRankingToggle';
+
 import { useWebSocket } from '@/hooks/useWebSocket';
 import woodenBg from '@/public/assets/images/wooden_bg.png';
 import woodenHead from '@/public/assets/images/woodenHead.png';
@@ -45,6 +47,13 @@ export default function BrokerInventoryPage() {
   const { getCurrentGameSession, notifications, isConnected, subscribe, joinGame, emit } = useWebSocket();
 
   const currentGameState = gameState;
+
+  const syncMyTeamFromGameState = useCallback((gs: GameState | null) => {
+    if (!gs || !user?.currentSession) return;
+    const currentTeam = gs.teams?.find((team: TeamData) => team.sessionId === user.currentSession);
+    if (currentTeam) setMyTeam(currentTeam);
+  }, [user?.currentSession]);
+
 
   const fetchGameState = async () => {
     if (!user?.currentSession) {
@@ -255,8 +264,9 @@ export default function BrokerInventoryPage() {
 
   useEffect(() => {
     const unsubGameStateUpdate = subscribe('game-state-update', (data: any) => {
-      if (data?.gameState) {
+            if (data?.gameState) {
         setGameState(data.gameState);
+        syncMyTeamFromGameState(data.gameState);
         if (
           data.gameState.gameStatus === 'complete' ||
           data.gameState.gameStatus === 'lost' ||
@@ -268,8 +278,9 @@ export default function BrokerInventoryPage() {
     });
 
     const unsubGameStateFull = subscribe('game-state-full', (data: any) => {
-      if (data?.gameState) {
+            if (data?.gameState) {
         setGameState(data.gameState);
+        syncMyTeamFromGameState(data.gameState);
         if (
           data.gameState.gameStatus === 'complete' ||
           data.gameState.gameStatus === 'lost' ||
@@ -288,38 +299,46 @@ export default function BrokerInventoryPage() {
       setLastActionType(data?.actionType || null);
     });
 
-    const unsubSystemCheckUpdate = subscribe('system-check-update', (data: any) => {
+        const unsubSystemCheckUpdate = subscribe('system-check-update', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
+        syncMyTeamFromGameState(data.gameState);
       }
     });
 
-    const unsubTurnEnded = subscribe('turn-ended', (data: any) => {
+        const unsubTurnEnded = subscribe('turn-ended', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
+        syncMyTeamFromGameState(data.gameState);
       }
     });
 
-    const unsubGameActions = subscribe('game-state-updated', (data: any) => {
+        const unsubGameActions = subscribe('game-state-updated', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
+        syncMyTeamFromGameState(data.gameState);
       }
+
 
       const actionType = data?.actionType;
-      if (
+            if (
         actionType === 'bid-placed' ||
         actionType === 'auction-updated' ||
+        actionType === 'auction-resolved' ||
         actionType === 'material-graded'
       ) {
         fetchGlobalAuctions();
+        fetchGameState();
       } else if (actionType === 'external-purchase') {
         fetchExternalStock();
+        fetchGameState();
       }
     });
 
-    const unsubCountdownExpired = subscribe('countdown-expired', (data: any) => {
+        const unsubCountdownExpired = subscribe('countdown-expired', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
+        syncMyTeamFromGameState(data.gameState);
         if (
           data.gameState.gameStatus === 'complete' ||
           data.gameState.gameStatus === 'lost' ||
@@ -334,15 +353,17 @@ export default function BrokerInventoryPage() {
       fetchExternalStock();
     });
 
-    const unsubCountdownStarted = subscribe('countdown-started', (data: any) => {
+        const unsubCountdownStarted = subscribe('countdown-started', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
+        syncMyTeamFromGameState(data.gameState);
       }
     });
 
-    const unsubCountdownCancelled = subscribe('countdown-cancelled', (data: any) => {
+        const unsubCountdownCancelled = subscribe('countdown-cancelled', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
+        syncMyTeamFromGameState(data.gameState);
       }
     });
 
@@ -363,6 +384,12 @@ export default function BrokerInventoryPage() {
 
     const unsubSystemMessage = subscribe('system-message', (_data: any) => {});
 
+        const unsubAuctionResolved = subscribe('auction-resolved', (_data: any) => {
+      // Ensure wallet/inventory UI updates immediately for winner/loser teams
+      fetchGlobalAuctions();
+      fetchGameState();
+    });
+
     const unsubSurrenderUpdate = subscribe('surrender-update', (data: any) => {
       if (data?.surrenderVotes && myTeam) {
         const updatedTeam = { ...myTeam, surrenderVotes: data.surrenderVotes };
@@ -379,11 +406,12 @@ export default function BrokerInventoryPage() {
       unsubCountdownExpired && unsubCountdownExpired();
       unsubCountdownStarted && unsubCountdownStarted();
       unsubCountdownCancelled && unsubCountdownCancelled();
-      unsubPlayerAction && unsubPlayerAction();
+            unsubPlayerAction && unsubPlayerAction();
       unsubSystemMessage && unsubSystemMessage();
+      unsubAuctionResolved && unsubAuctionResolved();
       unsubSurrenderUpdate && unsubSurrenderUpdate();
     };
-  }, [subscribe, router, fetchGameState, fetchGlobalAuctions, fetchExternalStock]);
+  }, [subscribe, router, fetchGameState, fetchGlobalAuctions, fetchExternalStock, syncMyTeamFromGameState]);
 
   const getDurationMinutes = () => {
     const c = currentGameState?.constants as any;
@@ -473,17 +501,26 @@ export default function BrokerInventoryPage() {
           </div>
           <div className="grid grid-cols-1 gap-3 flex-1 lg:min-h-0 lg:overflow-hidden">
             <div className="col-span-1 flex flex-col lg:min-h-0 lg:overflow-hidden">
-              <div
-                className="bg-cover bg-center mx-auto rounded-[20px] flex flex-col lg:min-h-0 overflow-hidden w-full flex-1"
+                            <div
+                className="relative bg-cover bg-center mx-auto rounded-[20px] flex flex-col lg:min-h-0 overflow-hidden w-full flex-1"
+
                 style={{ backgroundImage: `url(${woodenBg.src})` }}
               >
                 <MunicipalityCustomHeader
                   backgroundImage={woodenHead.src}
                   title={`${myTeam?.teamName || 'Your City'} (${myTeam?.citySlot || '?'}) | ${teamCount} Teams in Room`}
                 />
-                <GameModeBadge gameMode={gameMode} />
-                
+                                {/* <GameModeBadge gameMode={gameMode} /> */}
+
+                <div className="absolute right-3 top-[72px]">
+                  <LiveTeamRankingToggle
+                    teams={currentGameState?.teams || []}
+                    currentSessionId={user?.currentSession || undefined}
+                  />
+                </div>
+
                 {/* ✅ Team Timer Display */}
+
                 {/* <div className="flex justify-center my-1 flex-shrink-0">
                   <div className="bg-white rounded-lg px-4 py-1 shadow-md border border-[#A99065]">
                     <span className="font-bold text-[#33552C]">
@@ -525,9 +562,16 @@ export default function BrokerInventoryPage() {
                       External Wholesaler
                     </button>
                   </div>
+                                </div>
+
+                <div className="px-3 pb-2 text-center">
+                  <p className="inline-block rounded-md bg-white/90 px-3 py-1 text-[11px] font-medium text-[#5C4733] border border-[#D8C9AF]">
+                    Auction rule: winning team pays 100% of final bid. Seller receives 90%; 10% is marketplace service fee.
+                  </p>
                 </div>
-                
+
                 <div className="flex-1 lg:min-h-0 lg:overflow-hidden">
+
                   {activeTab === 'global-auctions' ? (
                     <BrokerGlobalAuctionSelectedBox
                       auctions={globalAuctions}
@@ -551,7 +595,7 @@ export default function BrokerInventoryPage() {
           </div>
         </div>
       </div>
-      {/* <SurrenderButton
+            {/* <SurrenderButton
         playerId={user?._id ?? ''}
         surrenderVotes={myTeam?.surrenderVotes ?? []}
         canSurrender={(myTeam?.minutesElapsed ?? 0) >= 15}
@@ -559,6 +603,7 @@ export default function BrokerInventoryPage() {
           if (user?.currentSession) emit('surrender-toggle', { sessionId: user.currentSession });
         }}
       /> */}
+      <GameChatbot pageContext="broker-inventory" />
     </div>
   );
 }

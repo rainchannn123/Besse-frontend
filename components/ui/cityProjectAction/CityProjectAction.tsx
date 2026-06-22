@@ -1,7 +1,7 @@
 'use client';
 
 import dollarBag from '@/public/assets/images/dollarBag.png';
-import paper from '@/public/assets/images/paper.png';
+
 import sideArrow from '@/public/assets/images/sideArrow.png';
 import { CityProject, MaterialType } from '@/types/besse';
 import Image from 'next/image';

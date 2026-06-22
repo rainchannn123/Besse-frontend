@@ -1,7 +1,7 @@
 "use client";
-import React, { JSX } from "react";
+import React from "react";
 import sideArrow from "@/public/assets/images/sideArrow.png";
-import Image from "next/image";
+import Image, { StaticImageData } from "next/image";
 import dollarBag from "@/public/assets/images/dollarBag.png";
 import lCo2 from "@/public/assets/images/lCo2.png";
 import smallBox from "@/public/assets/images/smallBox.png";
@@ -12,7 +12,7 @@ import power from "@/public/assets/images/power.png";
 interface Feature {
   id: number;
   name: string;
-  icon: JSX.Element;
+  icon: StaticImageData;
   level: number;
 }
 

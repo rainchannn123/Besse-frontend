@@ -13,6 +13,8 @@ import {
 import ShiftLog from '@/components/ui/shiftLog/ShiftLog';
 import { SurrenderButton } from '@/components/ui/surrenderButton/SurrenderButton';
 import GameChatbot from '@/components/ui/chatbot/GameChatbot';
+import LiveTeamRankingToggle from '@/components/ui/LiveTeamRankingToggle';
+
 import { useWebSocket } from '@/hooks/useWebSocket';
 import woodenBg from '@/public/assets/images/wooden_bg.png';
 import woodenHead from '@/public/assets/images/woodenHead.png';
@@ -53,6 +55,15 @@ export default function MRFCollectionPage() {
   const { getCurrentGameSession, notifications, isConnected, subscribe, joinGame, emit } = useWebSocket();
 
   const currentGameState = gameState;
+
+  const syncMyTeamFromGameState = useCallback((gs: GameState | null) => {
+    if (!gs || !user?.currentSession) return;
+    const currentTeam = gs.teams?.find((team: TeamData) => team.sessionId === user.currentSession);
+    if (!currentTeam) return;
+
+    setMyTeam(currentTeam);
+    setQueue(currentTeam.mrfQueue || []);
+  }, [user?.currentSession]);
   
   const fetchGameState = async () => {
     if (!user?.currentSession) {
@@ -70,8 +81,9 @@ export default function MRFCollectionPage() {
         const currentTeam = response.data.gameState.teams?.find(
           (team: TeamData) => team.sessionId === user.currentSession
         );
-        if (currentTeam) {
+                if (currentTeam) {
           setMyTeam(currentTeam);
+          setQueue(currentTeam.mrfQueue || []);
         }
         
         // ✅ Get team count
@@ -213,12 +225,14 @@ export default function MRFCollectionPage() {
     const unsubGameStateUpdate = subscribe('game-state-update', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
+        syncMyTeamFromGameState(data.gameState);
         
         const currentTeam = data.gameState.teams?.find(
           (team: TeamData) => team.sessionId === user?.currentSession
         );
-        if (currentTeam) {
+                if (currentTeam) {
           setMyTeam(currentTeam);
+          setQueue(currentTeam.mrfQueue || []);
         }
         
         if (
@@ -234,12 +248,14 @@ export default function MRFCollectionPage() {
     const unsubGameStateFull = subscribe('game-state-full', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
+        syncMyTeamFromGameState(data.gameState);
         
         const currentTeam = data.gameState.teams?.find(
           (team: TeamData) => team.sessionId === user?.currentSession
         );
-        if (currentTeam) {
+                if (currentTeam) {
           setMyTeam(currentTeam);
+          setQueue(currentTeam.mrfQueue || []);
         }
         
         if (
@@ -262,12 +278,14 @@ export default function MRFCollectionPage() {
     const unsubSystemCheckUpdate = subscribe('system-check-update', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
+        syncMyTeamFromGameState(data.gameState);
         
         const currentTeam = data.gameState.teams?.find(
           (team: TeamData) => team.sessionId === user?.currentSession
         );
-        if (currentTeam) {
+                if (currentTeam) {
           setMyTeam(currentTeam);
+          setQueue(currentTeam.mrfQueue || []);
         }
       }
     });
@@ -275,23 +293,26 @@ export default function MRFCollectionPage() {
     const unsubTurnEnded = subscribe('turn-ended', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
+        syncMyTeamFromGameState(data.gameState);
       }
     });
 
     const unsubGameActions = subscribe('game-state-updated', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
+        syncMyTeamFromGameState(data.gameState);
         
         const currentTeam = data.gameState.teams?.find(
           (team: TeamData) => team.sessionId === user?.currentSession
         );
-        if (currentTeam) {
+                if (currentTeam) {
           setMyTeam(currentTeam);
+          setQueue(currentTeam.mrfQueue || []);
         }
       }
 
       const actionType = data?.actionType;
-      if (actionType === 'waste-collected') {
+            if (actionType === 'waste-collected' || actionType === 'transport-completed') {
         fetchQueue();
       } else if (actionType === 'waste-processed') {
         fetchQueue();
@@ -302,7 +323,7 @@ export default function MRFCollectionPage() {
         fetchPendingAuctions();
       } else if (actionType === 'material-sold-external' || actionType === 'material-transferred') {
         fetchInventory();
-      } else if (actionType === 'auction-updated') {
+      } else if (actionType === 'auction-updated' || actionType === 'auction-resolved') {
         fetchPendingAuctions();
         fetchInventory();
       }
@@ -311,6 +332,7 @@ export default function MRFCollectionPage() {
     const unsubCountdownExpired = subscribe('countdown-expired', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
+        syncMyTeamFromGameState(data.gameState);
         
         if (
           data.gameState.gameStatus === 'won' ||
@@ -330,12 +352,14 @@ export default function MRFCollectionPage() {
     const unsubCountdownStarted = subscribe('countdown-started', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
+        syncMyTeamFromGameState(data.gameState);
       }
     });
 
     const unsubCountdownCancelled = subscribe('countdown-cancelled', (data: any) => {
       if (data?.gameState) {
         setGameState(data.gameState);
+        syncMyTeamFromGameState(data.gameState);
       }
     });
 
@@ -376,7 +400,7 @@ export default function MRFCollectionPage() {
       unsubSystemMessage && unsubSystemMessage();
       unsubSurrenderUpdate && unsubSurrenderUpdate();
     };
-  }, [subscribe, router, fetchQueue, fetchInventory, fetchPendingAuctions, myTeam]);
+  }, [subscribe, router, fetchQueue, fetchInventory, fetchPendingAuctions, myTeam, syncMyTeamFromGameState]);
 
   const getDurationMinutes = () => {
     const c = currentGameState?.constants as any;
@@ -562,7 +586,7 @@ export default function MRFCollectionPage() {
     }
   };
 
-  return (
+    return (
     <div className="lg:h-full flex flex-col lg:overflow-hidden">
       <div className="bg-[#f3e9da] flex-1 flex flex-col lg:min-h-0 lg:overflow-hidden">
         <div className="container mx-auto sm:p-0 px-4 flex flex-col flex-1 lg:min-h-0 lg:overflow-hidden gap-3">
@@ -580,122 +604,116 @@ export default function MRFCollectionPage() {
               onStatusLog={handleStatusLog}
             />
           </div>
-          
-          {/* MAIN CONTENT - Takes full width on all tabs */}
-          <div
-            className="bg-cover bg-center mr-auto rounded-[20px] flex flex-col lg:min-h-0 lg:max-h-[calc(100vh-21rem)] overflow-hidden w-full flex-1 min-w-0"
-            style={{ backgroundImage: `url(${woodenBg.src})` }}
-          >
-            <MunicipalityCustomHeader
-              backgroundImage={woodenHead.src}
-              title={`${myTeam?.teamName || 'Your City'} (${myTeam?.citySlot || '?'}) | ${teamCount} Teams`}
-            />
-            <GameModeBadge gameMode={gameMode} />
-            
-            {/* ✅ Team Timer Display */}
-            {/* <div className="flex justify-center my-1 flex-shrink-0">
-              <div className="bg-white rounded-lg px-4 py-1 shadow-md border border-[#A99065]">
-                <span className="font-bold text-[#33552C]">
-                  ⏱️ Time Remaining: 
-                  <span className={`ml-2 ${parseInt(teamTimer) < 3 ? 'text-red-600 animate-pulse' : 'text-[#50704C]'}`}>
-                    {teamTimer}
-                  </span>
-                </span>
-                {myTeam?.isEliminated && (
-                  <span className="ml-4 text-red-600 font-bold">💀 ELIMINATED</span>
-                )}
-                {myTeam?.gameStatus === 'completed' && (
-                  <span className="ml-4 text-green-600 font-bold">✅ COMPLETED</span>
-                )}
-              </div>
-            </div> */}
-            
-            {/* Tab Navigation */}
-            <div className="flex justify-center mb-3 flex-shrink-0 mt-2">
-              <div className="bg-white rounded-lg p-1 shadow-md flex gap-1">
-                <button
-                  onClick={() => setActiveTab('collection')}
-                  className={`px-6 py-2 rounded-md text-sm font-semibold transition-colors ${
-                    activeTab === 'collection'
-                      ? 'bg-[#3A7D2C] text-white'
-                      : 'text-gray-600 hover:bg-gray-100'
-                  }`}
-                >
-                  Collection
-                </button>
-                <button
-                  onClick={() => setActiveTab('analytics')}
-                  className={`px-6 py-2 rounded-md text-sm font-semibold transition-colors ${
-                    activeTab === 'analytics'
-                      ? 'bg-[#3A7D2C] text-white'
-                      : 'text-gray-600 hover:bg-gray-100'
-                  }`}
-                >
-                  Analytics
-                </button>
-                <button
-                  onClick={() => setActiveTab('pending')}
-                  className={`px-6 py-2 rounded-md text-sm font-semibold transition-colors ${
-                    activeTab === 'pending'
-                      ? 'bg-[#3A7D2C] text-white'
-                      : 'text-gray-600 hover:bg-gray-100'
-                  }`}
-                >
-                  Materials Ready
-                </button>
+
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 flex-1 lg:min-h-0 lg:overflow-hidden">
+            {/* Left side */}
+            <div className="xl:col-span-3 lg:col-span-2 col-span-1 flex flex-col lg:min-h-0 lg:overflow-hidden">
+                            <div
+                className="relative bg-cover bg-center mx-auto rounded-[20px] flex flex-col lg:min-h-0 overflow-hidden w-full flex-1"
+
+                style={{ backgroundImage: `url(${woodenBg.src})` }}
+              >
+                <MunicipalityCustomHeader
+                  backgroundImage={woodenHead.src}
+                  title={`${myTeam?.teamName || 'Your City'} (${myTeam?.citySlot || '?'}) | ${teamCount} Teams`}
+                />
+                {/* <GameModeBadge gameMode={gameMode} /> */}
+
+                <div className="absolute right-3 top-[72px]">
+                  <LiveTeamRankingToggle
+                    teams={currentGameState?.teams || []}
+                    currentSessionId={user?.currentSession || undefined}
+                  />
+                </div>
+
+                {/* Tab Navigation */}
+
+                <div className="flex justify-center mb-3 flex-shrink-0 mt-2">
+                  <div className="bg-white rounded-lg p-1 shadow-md flex gap-1">
+                    <button
+                      onClick={() => setActiveTab('collection')}
+                      className={`px-6 py-2 rounded-md text-sm font-semibold transition-colors ${
+                        activeTab === 'collection'
+                          ? 'bg-[#3A7D2C] text-white'
+                          : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      Unprocessed Material
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('pending')}
+                      className={`px-6 py-2 rounded-md text-sm font-semibold transition-colors ${
+                        activeTab === 'pending'
+                          ? 'bg-[#3A7D2C] text-white'
+                          : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      Recycled Material
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('analytics')}
+                      className={`px-6 py-2 rounded-md text-sm font-semibold transition-colors ${
+                        activeTab === 'analytics'
+                          ? 'bg-[#3A7D2C] text-white'
+                          : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      Analytics
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex-1 lg:min-h-0 lg:overflow-y-auto p-4">
+                  {activeTab === 'collection' && (
+                    <MRFCollectionSelectedBox
+                      key={availableBatches.map((b: WasteBatch) => b.id).join(',')}
+                      batches={availableBatches}
+                      selectedBatch={selectedItem as WasteBatch | null}
+                      setSelectedBatch={(batch) => setSelectedItem(batch)}
+                    />
+                  )}
+
+                  {activeTab === 'analytics' && (
+                    <MRFAnalytics
+                      wasteBatches={myTeam?.wasteBatches || []}
+                      inventory={inventory}
+                    />
+                  )}
+
+                  {activeTab === 'pending' && (
+                    <MRFPendingAuctionSelectedBox
+                      key={pendingAuctions.map((a) => a.id).join(',')}
+                      auctions={pendingAuctions as PendingAuction[]}
+                      selectedAuction={selectedItem as PendingAuction | null}
+                      setSelectedAuction={(auction) => setSelectedItem(auction)}
+                    />
+                  )}
+                </div>
               </div>
             </div>
-            
-            {/* CONTENT AREA - Changes based on active tab */}
-            <div className="flex-1 lg:min-h-0 lg:overflow-y-auto p-4">
-              {activeTab === 'collection' && (
-                <MRFCollectionSelectedBox
-                  key={availableBatches.map((b: WasteBatch) => b.id).join(',')}
-                  batches={availableBatches}
-                  selectedBatch={selectedItem as WasteBatch | null}
-                  setSelectedBatch={(batch) => setSelectedItem(batch)}
+
+            {/* Right side */}
+            <div className="xl:col-span-1 lg:col-span-2 col-span-1 lg:overflow-y-auto lg:min-h-0">
+              {activeTab === 'collection' ? (
+                selectedItem && 'status' in selectedItem ? (
+                  <MRFCollect
+                    budget={myTeam?.budget ?? 0}
+                    totalCO2={myTeam?.totalCO2 ?? 0}
+                    selectedItem={selectedItem}
+                    handleProcessWaste={handleProcessWaste}
+                  />
+                ) : null
+              ) : activeTab === 'pending' && selectedItem ? (
+                <PendingAuctionAction
+                  selectedAuction={selectedItem}
+                  handleAssignGradeAndPrice={handleAssignGradeAndPrice}
                 />
-              )}
-              
-              {activeTab === 'analytics' && (
-                <MRFAnalytics
-                  wasteBatches={myTeam?.wasteBatches || []}
-                  inventory={inventory}
-                />
-              )}
-              
-              {activeTab === 'pending' && (
-                <MRFPendingAuctionSelectedBox
-                  key={pendingAuctions.map((a) => a.id).join(',')}
-                  auctions={pendingAuctions as PendingAuction[]}
-                  selectedAuction={selectedItem as PendingAuction | null}
-                  setSelectedAuction={(auction) => setSelectedItem(auction)}
-                />
-              )}
+              ) : null}
             </div>
           </div>
         </div>
       </div>
-      
-      {/* RIGHT SIDE ACTION PANEL - Fixed position on the right side of screen */}
-      <div className="fixed right-4 top-1/2 transform -translate-y-1/2 z-10 w-80">
-        {activeTab === 'collection' && selectedItem && 'status' in selectedItem && (
-          <MRFCollect
-            budget={myTeam?.budget ?? 0}
-            totalCO2={myTeam?.totalCO2 ?? 0}
-            selectedItem={selectedItem}
-            handleProcessWaste={handleProcessWaste}
-          />
-        )}
-        
-        {activeTab === 'pending' && selectedItem && (
-          <PendingAuctionAction
-            selectedAuction={selectedItem}
-            handleAssignGradeAndPrice={handleAssignGradeAndPrice}
-          />
-        )}
-      </div>
-      
+
       {/* <SurrenderButton
         playerId={user?._id ?? ''}
         surrenderVotes={myTeam?.surrenderVotes ?? []}
@@ -703,7 +721,8 @@ export default function MRFCollectionPage() {
         onToggle={() => {
           if (user?.currentSession) emit('surrender-toggle', { sessionId: user.currentSession });
         }}
-      />  */}
+      /> */}
+      <GameChatbot pageContext="mrf-collection" />
     </div>
   );
 }
