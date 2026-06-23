@@ -419,8 +419,9 @@ export default function MunicipalityPage() {
           setActiveTransports(currentTeam.activeTransports);
         }
       }
+            const destinationLabel = data?.destination === 'municipality' ? 'Municipality inventory' : 'MRF';
       addNotification({
-        message: `🚛 ${data?.mode?.toUpperCase()} transport started! ${data?.batchMass?.toFixed(1)} tons will arrive in ${data?.durationSec || 30}s`,
+        message: `🚛 ${data?.mode?.toUpperCase()} transport started! ${Number(data?.batchMass || 0).toFixed(1)} tons heading to ${destinationLabel}.`,
         type: 'info',
       });
     });
@@ -436,8 +437,9 @@ export default function MunicipalityPage() {
           setActiveTransports(currentTeam.activeTransports);
         }
       }
+            const destinationLabel = data?.destination === 'municipality' ? 'Municipality inventory' : 'MRF';
       addNotification({
-        message: `✅ Transport completed! ${data?.batchMass?.toFixed(1)} tons delivered to MRF.`,
+        message: `✅ Transport completed! ${Number(data?.batchMass || 0).toFixed(1)} tons delivered to ${destinationLabel}.`,
         type: 'success',
       });
       fetchWasteBatches();

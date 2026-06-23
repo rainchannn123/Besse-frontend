@@ -1,20 +1,11 @@
 'use client';
 
+import { ActiveTransport } from '@/types/besse';
 import React from 'react';
 import { Clock, Zap } from 'lucide-react';
 
-interface TransportItem {
-  id: string;
-  mode: 'fast' | 'slow';
-  wasteBatch: {
-    mass: number;
-    origin: string;
-  };
-  endTime: number;
-}
-
 interface TransportProgressListProps {
-  transports: TransportItem[];
+  transports: ActiveTransport[];
 }
 
 const TransportProgressList: React.FC<TransportProgressListProps> = ({ transports }) => {
@@ -34,47 +25,60 @@ const TransportProgressList: React.FC<TransportProgressListProps> = ({ transport
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const getTransportMeta = (transport: ActiveTransport) => {
+    const isToMuni = transport.purpose === 'mrf-to-municipality';
+    const toLabel = isToMuni ? 'to Muni' : 'to MRF';
+    const isFast = transport.mode === 'fast';
+
+    if (isToMuni) {
+      return {
+        toLabel,
+        iconClass: isFast ? 'text-orange-700' : 'text-green-700',
+        textClass: isFast ? 'text-orange-800' : 'text-green-800',
+        barClass: isFast ? 'bg-orange-700' : 'bg-green-700',
+      };
+    }
+
+    return {
+      toLabel,
+      iconClass: isFast ? 'text-orange-500' : 'text-green-600',
+      textClass: isFast ? 'text-orange-600' : 'text-green-700',
+      barClass: isFast ? 'bg-orange-500' : 'bg-green-500',
+    };
+  };
+
   if (transports.length === 0) return null;
 
   return (
     <div className="space-y-1.5">
       {transports.map((transport) => {
         const isFast = transport.mode === 'fast';
-        const modeLabel = isFast ? 'Fast Transport' : 'Slow Transport';
         const totalDuration = isFast ? 30 : 60;
         const remaining = Math.max(0, Math.ceil((transport.endTime - now) / 1000));
-
-        // Countdown-style bar: starts full, then shrinks right-to-left.
         const progress = totalDuration > 0 ? (remaining / totalDuration) * 100 : 0;
+        const meta = getTransportMeta(transport);
 
         return (
           <div key={transport.id} className="flex items-center gap-2 h-6">
-            {/* Type icon */}
             {isFast ? (
-              <Zap className="h-3.5 w-3.5 text-orange-500 shrink-0" />
+              <Zap className={`h-3.5 w-3.5 shrink-0 ${meta.iconClass}`} />
             ) : (
-              <Clock className="h-3.5 w-3.5 text-green-600 shrink-0" />
+              <Clock className={`h-3.5 w-3.5 shrink-0 ${meta.iconClass}`} />
             )}
 
             <span
-              className={`text-[10px] font-semibold uppercase tracking-wide shrink-0 ${
-                isFast ? 'text-orange-600' : 'text-green-700'
-              }`}
+              className={`text-[10px] font-semibold uppercase tracking-wide shrink-0 ${meta.textClass}`}
             >
-              {modeLabel}
+              {`${isFast ? 'Fast' : 'Slow'} Transport (${meta.toLabel})`}
             </span>
 
-            {/* Single slim animated progress bar */}
             <div className="relative flex-1 h-1.5 rounded-full bg-gray-200 overflow-hidden">
               <div
-                className={`ml-auto h-full rounded-full transition-all duration-1000 ease-linear ${
-                  isFast ? 'bg-orange-500' : 'bg-green-500'
-                }`}
+                className={`ml-auto h-full rounded-full transition-all duration-1000 ease-linear ${meta.barClass}`}
                 style={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
               />
             </div>
 
-            {/* Compact timer */}
             <span className="font-mono text-[11px] font-semibold text-blue-700 w-10 text-right shrink-0">
               {formatTime(remaining)}
             </span>
@@ -84,6 +88,5 @@ const TransportProgressList: React.FC<TransportProgressListProps> = ({ transport
     </div>
   );
 };
-
 
 export default TransportProgressList;

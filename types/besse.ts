@@ -506,6 +506,8 @@ export interface ActiveTransport {
   cost: number;
   co2Emission: number;
   status: 'in-transit' | 'completed';
+  purpose?: 'waste-to-mrf' | 'mrf-to-municipality';
+  materialType?: MaterialType;
 }
 
 // Game Types
@@ -821,6 +823,11 @@ export interface PendingAuctionsResponse
       mass: number;
       createdAt: string;
     }>;
+  }> {}
+
+export interface MRFSendBackToMunicipalityResponse
+  extends ApiResponse<{
+    gameState: GameState;
   }> {}
 
 // Broker Types

@@ -5,6 +5,7 @@ import MunicipalityCustomHeader from '@/components/layout/header/customheader/Mu
 import GameModeBadge from '@/components/ui/GameModeBadge';
 import { MRFCollect } from '@/components/ui/MRFCollect/MRFCollect';
 import { PendingAuctionAction } from '@/components/ui/pendingAuctionAction/PendingAuctionAction';
+import { MRFSendBackAction } from '@/components/ui/mrfSendBackAction/MRFSendBackAction';
 import { MRFCollectionSelectedBox } from '@/components/ui/selectedBox/MRFCollectionSelectedBox';
 import {
   MRFPendingAuctionSelectedBox,
@@ -14,6 +15,7 @@ import ShiftLog from '@/components/ui/shiftLog/ShiftLog';
 import { SurrenderButton } from '@/components/ui/surrenderButton/SurrenderButton';
 import GameChatbot from '@/components/ui/chatbot/GameChatbot';
 import LiveTeamRankingToggle from '@/components/ui/LiveTeamRankingToggle';
+import TransportProgressList from '@/components/ui/TransportProgressList';
 
 import { useWebSocket } from '@/hooks/useWebSocket';
 import woodenBg from '@/public/assets/images/wooden_bg.png';
@@ -49,6 +51,10 @@ export default function MRFCollectionPage() {
   const [lastActionType, setLastActionType] = useState<string | null>(null);
   const [teamTimer, setTeamTimer] = useState<string>('15:00');
   const [teamCount, setTeamCount] = useState<number>(0);
+    const [activeTransports, setActiveTransports] = useState<any[]>([]);
+  const [pendingActionChoice, setPendingActionChoice] = useState<'auction' | 'municipality' | null>(null);
+  const [isSubmittingCollectionAction, setIsSubmittingCollectionAction] = useState(false);
+
   const [gameMode] = useState<string | null>(() =>
     typeof window !== 'undefined' ? localStorage.getItem('game_mode') : null
   );
@@ -61,8 +67,9 @@ export default function MRFCollectionPage() {
     const currentTeam = gs.teams?.find((team: TeamData) => team.sessionId === user.currentSession);
     if (!currentTeam) return;
 
-    setMyTeam(currentTeam);
+        setMyTeam(currentTeam);
     setQueue(currentTeam.mrfQueue || []);
+    setActiveTransports(currentTeam.activeTransports || []);
   }, [user?.currentSession]);
   
   const fetchGameState = async () => {
@@ -84,6 +91,7 @@ export default function MRFCollectionPage() {
                 if (currentTeam) {
           setMyTeam(currentTeam);
           setQueue(currentTeam.mrfQueue || []);
+          setActiveTransports(currentTeam.activeTransports || []);
         }
         
         // ✅ Get team count
@@ -174,16 +182,21 @@ export default function MRFCollectionPage() {
     return () => clearInterval(interval);
   }, [myTeam]);
 
-  useEffect(() => {
+    useEffect(() => {
     setSelectedItem(null);
     setSelectedGrade('');
+    setPendingActionChoice(null);
   }, [activeTab]);
 
-  useEffect(() => {
+    useEffect(() => {
     if (selectedItem && 'quality' in selectedItem) {
       setSelectedGrade(selectedItem.quality);
     } else {
       setSelectedGrade('');
+    }
+
+    if (!selectedItem) {
+      setPendingActionChoice(null);
     }
   }, [selectedItem]);
 
@@ -233,6 +246,7 @@ export default function MRFCollectionPage() {
                 if (currentTeam) {
           setMyTeam(currentTeam);
           setQueue(currentTeam.mrfQueue || []);
+          setActiveTransports(currentTeam.activeTransports || []);
         }
         
         if (
@@ -256,6 +270,7 @@ export default function MRFCollectionPage() {
                 if (currentTeam) {
           setMyTeam(currentTeam);
           setQueue(currentTeam.mrfQueue || []);
+          setActiveTransports(currentTeam.activeTransports || []);
         }
         
         if (
@@ -286,6 +301,7 @@ export default function MRFCollectionPage() {
                 if (currentTeam) {
           setMyTeam(currentTeam);
           setQueue(currentTeam.mrfQueue || []);
+          setActiveTransports(currentTeam.activeTransports || []);
         }
       }
     });
@@ -308,22 +324,29 @@ export default function MRFCollectionPage() {
                 if (currentTeam) {
           setMyTeam(currentTeam);
           setQueue(currentTeam.mrfQueue || []);
+          setActiveTransports(currentTeam.activeTransports || []);
         }
       }
 
-      const actionType = data?.actionType;
-            if (actionType === 'waste-collected' || actionType === 'transport-completed') {
+            const actionType = data?.actionType;
+            if (actionType === 'waste-collected') {
         fetchQueue();
-      } else if (actionType === 'waste-processed') {
+      } else if (actionType === 'waste-processed' || actionType === 'waste-landfilled') {
         fetchQueue();
         fetchInventory();
         fetchPendingAuctions();
       } else if (actionType === 'material-graded') {
+
         fetchInventory();
         fetchPendingAuctions();
       } else if (actionType === 'material-sold-external' || actionType === 'material-transferred') {
         fetchInventory();
-      } else if (actionType === 'auction-updated' || actionType === 'auction-resolved') {
+      } else if (
+        actionType === 'auction-updated' ||
+        actionType === 'auction-resolved' ||
+        actionType === 'transport-started' ||
+        actionType === 'transport-completed'
+      ) {
         fetchPendingAuctions();
         fetchInventory();
       }
@@ -363,6 +386,46 @@ export default function MRFCollectionPage() {
       }
     });
 
+        const unsubTransportStarted = subscribe('transport-started', (data: any) => {
+      if (data?.gameState) {
+        setGameState(data.gameState);
+        syncMyTeamFromGameState(data.gameState);
+        const currentTeam = data.gameState.teams?.find(
+          (team: TeamData) => team.sessionId === user?.currentSession
+        );
+        if (currentTeam?.activeTransports) {
+          setActiveTransports(currentTeam.activeTransports);
+        }
+      }
+
+      if (data?.source === 'mrf' && data?.destination === 'municipality') {
+        addNotification({
+          message: `Transport started: ${data?.mode?.toUpperCase()} mode, ${Number(data?.batchMass || 0).toFixed(1)}t to Municipality.`,
+          type: 'info',
+        });
+      }
+    });
+
+    const unsubTransportCompleted = subscribe('transport-completed', (data: any) => {
+      if (data?.gameState) {
+        setGameState(data.gameState);
+        syncMyTeamFromGameState(data.gameState);
+        const currentTeam = data.gameState.teams?.find(
+          (team: TeamData) => team.sessionId === user?.currentSession
+        );
+        if (currentTeam?.activeTransports) {
+          setActiveTransports(currentTeam.activeTransports);
+        }
+      }
+
+      if (data?.source === 'mrf' && data?.destination === 'municipality') {
+        addNotification({
+          message: `Transport completed: ${Number(data?.batchMass || 0).toFixed(1)}t delivered to Municipality inventory.`,
+          type: 'success',
+        });
+      }
+    });
+
     const unsubPlayerAction = subscribe('player-action', (data: any) => {
       const st = shiftStartTimeRef.current;
       const elapsed = st ? Math.max(0, Date.now() - new Date(st).getTime()) : 0;
@@ -396,11 +459,23 @@ export default function MRFCollectionPage() {
       unsubCountdownExpired && unsubCountdownExpired();
       unsubCountdownStarted && unsubCountdownStarted();
       unsubCountdownCancelled && unsubCountdownCancelled();
+            unsubTransportStarted && unsubTransportStarted();
+      unsubTransportCompleted && unsubTransportCompleted();
       unsubPlayerAction && unsubPlayerAction();
       unsubSystemMessage && unsubSystemMessage();
       unsubSurrenderUpdate && unsubSurrenderUpdate();
     };
-  }, [subscribe, router, fetchQueue, fetchInventory, fetchPendingAuctions, myTeam, syncMyTeamFromGameState]);
+  }, [
+    subscribe,
+    router,
+    fetchQueue,
+    fetchInventory,
+    fetchPendingAuctions,
+    myTeam,
+    syncMyTeamFromGameState,
+    addNotification,
+    user?.currentSession,
+  ]);
 
   const getDurationMinutes = () => {
     const c = currentGameState?.constants as any;
@@ -470,7 +545,7 @@ export default function MRFCollectionPage() {
     );
   }
 
-  const handleProcessWaste = async () => {
+    const handleProcessWaste = async () => {
     if (myTeam?.isEliminated) {
       addNotification({
         message: 'Your team has been eliminated. Cannot process waste.',
@@ -479,38 +554,115 @@ export default function MRFCollectionPage() {
       return;
     }
 
-    if (selectedItem && user?.currentSession) {
-      const queueItem = queue.find((q) => q.batchId === selectedItem.id);
-      if (!queueItem) {
-        addNotification({
-          message: 'Queue item not found',
-          type: 'error',
-        });
-        return;
-      }
+    if (!selectedItem || !user?.currentSession) {
+      addNotification({
+        message: 'Already processed or no item selected',
+        type: 'error',
+      });
+      return;
+    }
+
+    const queueItem = queue.find((q) => q.batchId === selectedItem.id);
+    if (!queueItem) {
+      addNotification({
+        message: 'Queue item not found',
+        type: 'error',
+      });
+      return;
+    }
+
+    try {
+      setIsSubmittingCollectionAction(true);
       const response = await mrfService.processWaste({
         queueId: queueItem.id,
         sessionId: user.currentSession,
       });
+
       if (response.success) {
         addNotification({
-          message: 'Material Sent to Inventory',
+          message: 'Material sent to recycled material tab.',
           type: 'success',
         });
         setSelectedItem(null);
         fetchGameState();
         fetchQueue();
         fetchInventory();
+      } else {
+        addNotification({
+          message: response.message || 'Failed to process waste',
+          type: 'error',
+        });
       }
-    } else {
+    } catch (err: any) {
       addNotification({
-        message: 'Already processed or no item selected',
+        message: err?.message || 'Failed to process waste',
         type: 'error',
       });
+    } finally {
+      setIsSubmittingCollectionAction(false);
+    }
+  };
+
+
+    const handleSendToLandfill = async () => {
+    if (myTeam?.isEliminated) {
+      addNotification({
+        message: 'Your team has been eliminated. Cannot landfill waste.',
+        type: 'error',
+      });
+      return;
+    }
+
+    if (!selectedItem || !user?.currentSession) {
+      addNotification({
+        message: 'No waste batch selected',
+        type: 'error',
+      });
+      return;
+    }
+
+    const queueItem = queue.find((q) => q.batchId === selectedItem.id);
+    if (!queueItem) {
+      addNotification({
+        message: 'Queue item not found',
+        type: 'error',
+      });
+      return;
+    }
+
+    try {
+      setIsSubmittingCollectionAction(true);
+      const response = await mrfService.sendToLandfill({
+        queueId: queueItem.id,
+        sessionId: user.currentSession,
+      });
+
+      if (response.success) {
+        addNotification({
+          message: 'Waste batch sent directly to landfill.',
+          type: 'warning',
+        });
+        setSelectedItem(null);
+        fetchGameState();
+        fetchQueue();
+      } else {
+        addNotification({
+          message: response.message || 'Failed to send waste to landfill',
+          type: 'error',
+        });
+      }
+    } catch (err: any) {
+      addNotification({
+        message: err?.message || 'Failed to send waste to landfill',
+        type: 'error',
+      });
+    } finally {
+      setIsSubmittingCollectionAction(false);
     }
   };
 
   const handleAssignGrade = async (grade: string) => {
+
     if (myTeam?.isEliminated) {
       addNotification({
         message: 'Your team has been eliminated. Cannot assign grades.',
@@ -548,7 +700,7 @@ export default function MRFCollectionPage() {
     }
   };
 
-  const handleAssignGradeAndPrice = async (grade: string, customPrice: number) => {
+    const handleAssignGradeAndPrice = async (grade: string, customPrice: number) => {
     if (myTeam?.isEliminated) {
       addNotification({
         message: 'Your team has been eliminated. Cannot activate auctions.',
@@ -586,10 +738,35 @@ export default function MRFCollectionPage() {
     }
   };
 
+  const handleSendBackToMunicipality = async (mode: 'fast' | 'slow') => {
+    if (!user?.currentSession || !selectedItem || !('materialType' in selectedItem)) {
+      addNotification({ message: 'No recycled material selected', type: 'error' });
+      return;
+    }
+
+    const auctionId = selectedItem.auctionId || selectedItem.id;
+    const response = await mrfService.sendBackToMunicipalityWithTransport(user.currentSession, {
+      auctionId,
+      sessionId: user.currentSession,
+      mode,
+    });
+
+    if (response.success) {
+      addNotification({ message: 'Transport started successfully', type: 'success' });
+      setSelectedItem(null);
+      fetchGameState();
+      fetchPendingAuctions();
+    } else {
+      addNotification({ message: response.message || 'Failed to start transport', type: 'error' });
+    }
+  };
+
     return (
     <div className="lg:h-full flex flex-col lg:overflow-hidden">
       <div className="bg-[#f3e9da] flex-1 flex flex-col lg:min-h-0 lg:overflow-hidden">
         <div className="container mx-auto sm:p-0 px-4 flex flex-col flex-1 lg:min-h-0 lg:overflow-hidden gap-3">
+          <TransportProgressList transports={activeTransports} />
+
           <div className="flex-shrink-0">
             <ShiftLog
               logs={logData}
@@ -693,21 +870,60 @@ export default function MRFCollectionPage() {
             </div>
 
             {/* Right side */}
-            <div className="xl:col-span-1 lg:col-span-2 col-span-1 lg:overflow-y-auto lg:min-h-0">
+                        <div className="xl:col-span-1 lg:col-span-2 col-span-1 lg:overflow-y-auto lg:min-h-0">
               {activeTab === 'collection' ? (
                 selectedItem && 'status' in selectedItem ? (
-                  <MRFCollect
+                                    <MRFCollect
                     budget={myTeam?.budget ?? 0}
                     totalCO2={myTeam?.totalCO2 ?? 0}
                     selectedItem={selectedItem}
                     handleProcessWaste={handleProcessWaste}
+                    handleSendToLandfill={handleSendToLandfill}
+                    isSubmitting={isSubmittingCollectionAction}
                   />
+
                 ) : null
               ) : activeTab === 'pending' && selectedItem ? (
-                <PendingAuctionAction
-                  selectedAuction={selectedItem}
-                  handleAssignGradeAndPrice={handleAssignGradeAndPrice}
-                />
+                <div className="space-y-3">
+                  <div className="bg-white border-4 border-dashed border-[#b18c5a] rounded-md p-3">
+                    <h3 className="text-center text-[20px] font-bold text-black mb-2">Choose Action</h3>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => setPendingActionChoice('auction')}
+                        className={`rounded-md py-2 px-2 text-sm font-semibold transition-colors ${
+                          pendingActionChoice === 'auction'
+                            ? 'bg-[#3A7D2C] text-white'
+                            : 'bg-[#F2E9DC] text-[#5A452A] hover:bg-[#e6dac7]'
+                        }`}
+                      >
+                        Sell in Auction
+                      </button>
+                      <button
+                        onClick={() => setPendingActionChoice('municipality')}
+                        className={`rounded-md py-2 px-2 text-sm font-semibold transition-colors ${
+                          pendingActionChoice === 'municipality'
+                            ? 'bg-[#3A7D2C] text-white'
+                            : 'bg-[#F2E9DC] text-[#5A452A] hover:bg-[#e6dac7]'
+                        }`}
+                      >
+                        Send Back to Muni
+                      </button>
+                    </div>
+                  </div>
+
+                  {pendingActionChoice === 'auction' ? (
+                    <PendingAuctionAction
+                      selectedAuction={selectedItem}
+                      handleAssignGradeAndPrice={handleAssignGradeAndPrice}
+                    />
+                  ) : pendingActionChoice === 'municipality' ? (
+                    <MRFSendBackAction
+                      budget={myTeam?.budget ?? 0}
+                      selectedAuction={selectedItem}
+                      onSendBack={handleSendBackToMunicipality}
+                    />
+                  ) : null}
+                </div>
               ) : null}
             </div>
           </div>

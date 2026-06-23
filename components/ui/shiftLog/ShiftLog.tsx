@@ -185,63 +185,68 @@ const ShiftLog: React.FC<ShiftLogProps> = ({
         {logs.map((log, index) => (
           <div key={index} className="mb-0.5 flex items-start">
             <p className="font-poppins xl:text-[12px] lg:text-[11px] text-[11px] leading-[1.4] text-black">
-              {log.time} – {log.message}
+              {log.time} - {log.message}
             </p>
           </div>
         ))}
       </div>
 
-      {/* Right: Time & Status */}
+            {/* Right: Time & Status */}
       <div className="flex flex-col justify-center gap-1">
-        {/* ✅ Team Timer - ALWAYS SHOW with status */}
-        <div className={`bg-[#8b6647] px-2 rounded-[30px] flex items-center justify-between h-[50px] w-full col-span-1 gap-2 ${isEliminated ? 'border-2 border-red-500' : ''}`}>
-          <div className="flex items-center gap-2">
-            <span className="font-bold xl:text-[22px] lg:text-[18px] md:text-[16px] text-[14px] text-white font-roboto">
-              {isEliminated ? '💀' : '⏱️'}
-            </span>
-            <span className="font-bold xl:text-[22px] lg:text-[18px] md:text-[16px] text-[14px] text-white font-roboto pr-2">
-              Day {currentDay} -
-            </span>
-          </div>
-          
-          <div className="flex items-center gap-2">
+        <div
+                                        className={`bg-[#8b6647] rounded-[28px] h-[48px] w-fit min-w-[320px] md:min-w-[400px] max-w-full mx-auto px-4 flex items-center justify-center ${
+            isEliminated ? 'border-2 border-red-500' : ''
+          }`}
+
+
+        >
+          <div className="flex items-center justify-center gap-2 md:gap-3 flex-wrap">
+            <div className="flex-shrink-0">
+              <Image src={clock} alt="clock" width={28} height={28} />
+            </div>
+
             {gameOverDisplay ? (
-              <span className="font-bold xl:text-[22px] lg:text-[18px] md:text-[16px] text-[14px] text-white font-roboto animate-pulse">
+              <span className="font-bold xl:text-[22px] lg:text-[18px] md:text-[16px] text-[14px] text-white font-roboto animate-pulse leading-none">
                 {gameOverDisplay}
               </span>
             ) : teamTimer ? (
-              <span className={`font-bold xl:text-[22px] lg:text-[18px] md:text-[16px] text-[14px] font-roboto ${
-                isEliminated ? 'text-red-400' :
-                parseInt(teamTimer) < 3 ? 'text-red-400 animate-pulse' : 'text-white'
-              }`}>
+              <span
+                className={`font-bold xl:text-[22px] lg:text-[18px] md:text-[16px] text-[14px] font-roboto leading-none ${
+                  isEliminated
+                    ? 'text-red-400'
+                    : parseInt(teamTimer) < 3
+                      ? 'text-red-400 animate-pulse'
+                      : 'text-white'
+                }`}
+              >
                 {teamTimer}
               </span>
             ) : (
-              <span className="font-bold xl:text-[22px] lg:text-[18px] md:text-[16px] text-[14px] text-white font-roboto">
+              <span className="font-bold xl:text-[22px] lg:text-[18px] md:text-[16px] text-[14px] text-white font-roboto leading-none">
                 {shiftCountdown}
               </span>
             )}
-            
-            {/* ✅ Status Badge */}
+
+                        <span className="font-bold xl:text-[22px] lg:text-[18px] md:text-[16px] text-[14px] text-white font-roboto leading-none">
+              (Day {currentDay})
+            </span>
+
+
             {isEliminated && (
-              <span className="bg-red-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+              <span className="bg-red-600 text-white text-[10px] md:text-xs font-bold px-2 py-0.5 rounded-full leading-none">
                 ELIMINATED
               </span>
             )}
             {!isEliminated && teamStatus === 'completed' && (
-              <span className="bg-green-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+              <span className="bg-green-600 text-white text-[10px] md:text-xs font-bold px-2 py-0.5 rounded-full leading-none">
                 COMPLETED
               </span>
             )}
             {!isEliminated && teamStatus === 'active' && (
-              <span className="bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+              <span className="bg-blue-600 text-white text-[10px] md:text-xs font-bold px-2 py-0.5 rounded-full leading-none">
                 ACTIVE
               </span>
             )}
-            
-            <div className="flex-shrink-0">
-              <Image src={clock} alt="clock" width={32} height={32} />
-            </div>
           </div>
         </div>
       </div>

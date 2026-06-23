@@ -1,15 +1,16 @@
 'use client';
 
 import paper from '@/public/assets/images/paper.png';
-import sideArrow from '@/public/assets/images/sideArrow.png';
 import Image from 'next/image';
-import React, { useState } from 'react';
+import React from 'react';
 
 interface MRFCollectProps {
   budget?: number;
   totalCO2?: number;
   selectedItem?: any;
   handleProcessWaste?: () => void;
+  handleSendToLandfill?: () => void;
+  isSubmitting?: boolean;
 }
 
 export const MRFCollect: React.FC<MRFCollectProps> = ({
@@ -17,8 +18,10 @@ export const MRFCollect: React.FC<MRFCollectProps> = ({
   totalCO2,
   selectedItem,
   handleProcessWaste,
+  handleSendToLandfill,
+  isSubmitting,
 }) => {
-  const [actionSelected, setActionSelected] = useState(false);
+
   return (
     <div className="">
       <div className="bg-white border-4 border-dashed border-[#b18c5a] rounded-md p-4">
@@ -42,25 +45,23 @@ export const MRFCollect: React.FC<MRFCollectProps> = ({
           </p>
         </div>
 
-        <div className="flex justify-center">
-          <div className="flex items-center">
-            <input
-              type="radio"
-              id="process"
-              name="action"
-              value="process"
-              className="form-radio w-5 h-5  accent-[#3A7D2C] cursor-pointer"
-              checked={actionSelected}
-              onChange={() => setActionSelected(true)}
-            />
-            <label
-              htmlFor="process"
-              className="ml-2 2xl:text-[20px] xl:text-[17px]  lg:text-[20px] md:text-[20px] text-[20px] font-bold text-black font-roboto"
-            >
-              Process
-            </label>
-          </div>
+                <div className="grid grid-cols-2 gap-2 my-4">
+          <button
+            onClick={handleProcessWaste}
+            className="bg-[#50704C] hover:bg-[#5a8a42] text-white py-2 rounded-[5px] font-bold disabled:opacity-50"
+            disabled={!selectedItem || selectedItem.processed || isSubmitting}
+          >
+            Recycle
+          </button>
+          <button
+            onClick={handleSendToLandfill}
+            className="bg-[#A65A3A] hover:bg-[#8f4d32] text-white py-2 rounded-[5px] font-bold disabled:opacity-50"
+            disabled={!selectedItem || selectedItem.processed || isSubmitting}
+          >
+            To Landfill
+          </button>
         </div>
+
         <div className="mb-5 mt-5 space-y-2">
           {/* Budget */}
           {/* <div className="flex justify-between items-center">
@@ -102,21 +103,7 @@ export const MRFCollect: React.FC<MRFCollectProps> = ({
           </div> */}
         </div>
 
-        <button
-          onClick={handleProcessWaste}
-          className="w-full bg-[#50704C] hover:bg-[#5a8a42] flex justify-around rounded-[5px] disabled:opacity-50"
-          disabled={!selectedItem || selectedItem.processed || !actionSelected}
-        >
-          <p></p>
-          <p className="text-white py-2 rounded-[5px] font-bold 2xl:text-[24px] xl:text-[16px] lg:text-[24px] text-[24px]">
-            Confirm
-          </p>
-          <div className="flex items-center">
-            <div className="bg-[#C0D066] w-[33px] h-[33px] rounded-[50%] flex justify-center items-center">
-              <Image src={sideArrow} alt="sideArrow" />
-            </div>
-          </div>
-        </button>
+        
       </div>
     </div>
   );
