@@ -343,29 +343,6 @@ export default function GameOverPage() {
                              'Active'}
                           </p>
                         </div> */}
-                        <div className="flex items-center justify-between">
-                          <div className="flex gap-3 items-center">
-                            <Image src={trophy} alt="score" width={28} height={28} className="lg:w-5 lg:h-5 w-7 h-7 object-contain" />
-                            <p className="font-bold font-roboto lg:text-[18px] md:text-[25px] text-[15px] text-black">
-                              Total Score
-                            </p>
-                          </div>
-                                                    <p className="font-bold font-roboto lg:text-[22px] md:text-[25px] text-[15px] text-black">
-                            {totalProjectScore}
-                          </p>
-
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div className="flex gap-3 items-center">
-                            <Image src={trophy} alt="score" width={28} height={28} className="lg:w-5 lg:h-5 w-7 h-7 object-contain" />
-                            <p className="font-bold font-roboto lg:text-[18px] md:text-[25px] text-[15px] text-black">
-                              Total Score
-                            </p>
-                          </div>
-                          <p className="font-bold font-roboto lg:text-[22px] md:text-[25px] text-[15px] text-black">
-                            {Number(gameState?.teamScore || 0)}
-                          </p>
-                        </div>
                         {/* ✅ Project Score */}
                         {/* <div className="flex items-center justify-between border-t pt-2 mt-2">
                           <div className="flex gap-3 items-center">
