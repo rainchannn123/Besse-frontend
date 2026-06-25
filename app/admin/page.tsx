@@ -6,6 +6,7 @@ import { AdminMonitorOverviewData, AdminPlayerGameRecord, AdminPlayerRow, AdminP
 import { useRouter } from 'next/navigation';
 import { Fragment, useEffect, useMemo, useState, useCallback } from 'react';
 import StudentRegistrationModal from '@/components/admin/StudentRegistrationModal';
+import ActivityLogModal from '@/components/admin/ActivityLogModal';
 
 interface Room {
   roomCode: string;
@@ -67,6 +68,7 @@ export default function AdminMonitorPage() {
   const [historyRecords, setHistoryRecords] = useState<Record<string, AdminPlayerGameRecord[]>>({});
   const [historyLoading, setHistoryLoading] = useState<string | null>(null);
   const [showRegistrationModal, setShowRegistrationModal] = useState(false);
+  const [showActivityLogModal, setShowActivityLogModal] = useState(false);
   const [creatingRoom, setCreatingRoom] = useState(false);
   const [rooms, setRooms] = useState<Room[]>([]);
 
@@ -456,6 +458,14 @@ export default function AdminMonitorPage() {
                 className="rounded-lg border border-[#5b7f3b] px-4 py-2 text-[#2e4a1f] font-semibold hover:bg-[#eef8e4]"
               >
                 Register Students
+              </button>
+              <button
+                onClick={() => setShowActivityLogModal(true)}
+                className="flex items-center gap-2 rounded-lg border border-[#5b7f3b] bg-[#eef8e4] px-4 py-2 text-[#2e4a1f] font-semibold hover:bg-[#dff0d0]"
+                title="View audit trail of all platform activity"
+              >
+                <span className="text-base leading-none">📋</span>
+                Activity Log
               </button>
               <button
                 onClick={handleLogout}
@@ -848,6 +858,12 @@ export default function AdminMonitorPage() {
           });
           loadOverview(true);
         }}
+      />
+
+      {/* Activity Log Modal */}
+      <ActivityLogModal
+        isOpen={showActivityLogModal}
+        onClose={() => setShowActivityLogModal(false)}
       />
     </>
   );

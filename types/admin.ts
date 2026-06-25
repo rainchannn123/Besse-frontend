@@ -124,3 +124,78 @@ export interface AdminPlayerHistoryData {
 }
 
 export interface AdminPlayerHistoryResponse extends ApiResponse<AdminPlayerHistoryData> {}
+
+// ─────────────────────────────────────────────────────────────
+// Activity Log types
+// ─────────────────────────────────────────────────────────────
+
+export type ActivityCategory =
+  | 'auth'
+  | 'lobby'
+  | 'matchmaking'
+  | 'game'
+  | 'municipality'
+  | 'mrf'
+  | 'broker'
+  | 'admin'
+  | 'system';
+
+export type ActivityStatus = 'success' | 'failure';
+
+export interface ActivityLogEntry {
+  _id: string;
+  userId: string | null;
+  userName: string | null;
+  userEmail: string | null;
+  accountType: string | null;
+  role: string | null;
+  category: ActivityCategory;
+  action: string;
+  description: string;
+  sessionId: string | null;
+  targetUserId: string | null;
+  targetUserName: string | null;
+  status: ActivityStatus;
+  statusCode: number | null;
+  method: string | null;
+  route: string | null;
+  ipAddress: string | null;
+  userAgent: string | null;
+  metadata: Record<string, any>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ActivityLogListData {
+  logs: ActivityLogEntry[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface ActivityLogListResponse extends ApiResponse<ActivityLogListData> {}
+
+export interface ActivityLogStatsData {
+  totalLogs: number;
+  byCategory: Array<{ category: string; count: number }>;
+  byStatus: Array<{ status: string; count: number }>;
+  last24Hours: number;
+  last7Days: number;
+}
+
+export interface ActivityLogStatsResponse extends ApiResponse<ActivityLogStatsData> {}
+
+export interface ActivityLogFilters {
+  page?: number;
+  limit?: number;
+  category?: ActivityCategory | '';
+  status?: ActivityStatus | '';
+  action?: string;
+  userId?: string;
+  userEmail?: string;
+  sessionId?: string;
+  search?: string;
+  fromDate?: string;
+  toDate?: string;
+}

@@ -1,6 +1,9 @@
 import axios from 'axios';
 import { secureStorage } from '@/utils/secureStorage';
 import {
+  ActivityLogFilters,
+  ActivityLogListResponse,
+  ActivityLogStatsResponse,
   AdminForceExitResponse,
   AdminLoginResponse,
   AdminOverviewResponse,
@@ -159,6 +162,48 @@ export const adminService = {
       return response.data;
     } catch (error: any) {
       console.error('❌ Failed to fetch player history:', error.message);
+      throw error;
+    }
+  },
+
+  async getActivityLogs(
+    filters: ActivityLogFilters = {}
+  ): Promise<ActivityLogListResponse> {
+    try {
+      const params: Record<string, any> = {
+        page: filters.page ?? 1,
+        limit: filters.limit ?? 50,
+      };
+
+      if (filters.category) params.category = filters.category;
+      if (filters.status) params.status = filters.status;
+      if (filters.action) params.action = filters.action;
+      if (filters.userId) params.userId = filters.userId;
+      if (filters.userEmail) params.userEmail = filters.userEmail;
+      if (filters.sessionId) params.sessionId = filters.sessionId;
+      if (filters.search) params.search = filters.search;
+      if (filters.fromDate) params.fromDate = filters.fromDate;
+      if (filters.toDate) params.toDate = filters.toDate;
+
+      const response = await adminApi.get<ActivityLogListResponse>(
+        '/admin/activity-logs',
+        { params }
+      );
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Failed to fetch activity logs:', error.message);
+      throw error;
+    }
+  },
+
+  async getActivityLogStats(): Promise<ActivityLogStatsResponse> {
+    try {
+      const response = await adminApi.get<ActivityLogStatsResponse>(
+        '/admin/activity-logs/stats'
+      );
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Failed to fetch activity log stats:', error.message);
       throw error;
     }
   },

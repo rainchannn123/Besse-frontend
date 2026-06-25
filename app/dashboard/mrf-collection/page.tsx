@@ -854,6 +854,7 @@ export default function MRFCollectionPage() {
                     <MRFAnalytics
                       wasteBatches={myTeam?.wasteBatches || []}
                       inventory={inventory}
+                      marketplaceListing={myTeam?.marketplaceListing || []}
                     />
                   )}
 
