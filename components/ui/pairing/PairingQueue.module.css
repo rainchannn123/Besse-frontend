@@ -1,0 +1,134 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.content {
+  text-align: center;
+}
+
+.title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #33552C;
+  margin: 0 0 8px;
+}
+
+.subtitle {
+  font-size: 14px;
+  color: #8b6647;
+  margin: 0 0 24px;
+}
+
+.description {
+  background: #F8F0DD;
+  border-left: 4px solid #b18c5a;
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+  text-align: left;
+}
+
+.description p {
+  font-size: 14px;
+  color: #33552C;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.features {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.feature {
+  padding: 16px;
+  background: #F8F0DD;
+  border-radius: 8px;
+  border: 1px solid #b18c5a;
+}
+
+.icon {
+  font-size: 24px;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.feature p {
+  font-size: 12px;
+  font-weight: 600;
+  color: #33552C;
+  margin: 0;
+}
+
+.joinButton {
+  width: 100%;
+  padding: 14px 24px;
+  background: linear-gradient(135deg, #50704C 0%, #3A7D2C 100%);
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+  border: 2px solid #33552C;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.joinButton:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(51, 85, 44, 0.3);
+}
+
+.joinButton:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.info {
+  font-size: 13px;
+  color: #8b6647;
+  margin: 0;
+  line-height: 1.5;
+}
+
+@media (max-width: 600px) {
+  .content {
+    padding: 24px;
+  }
+
+  .title {
+    font-size: 24px;
+  }
+
+  .features {
+    grid-template-columns: 1fr;
+  }
+}
