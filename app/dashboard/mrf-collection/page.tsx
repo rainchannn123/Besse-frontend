@@ -486,8 +486,13 @@ export default function MRFCollectionPage() {
     } catch {}
     return 15;
   };
-  const totalDurMin = getDurationMinutes();
+    const totalDurMin = getDurationMinutes();
+  const fastTransportDurationSeconds =
+    currentGameState?.constants?.TRANSPORT_FAST_DURATION_SECONDS ?? 20;
+  const slowTransportDurationSeconds =
+    currentGameState?.constants?.TRANSPORT_SLOW_DURATION_SECONDS ?? 40;
   const staticLogData: { time: string; message: string }[] = [];
+
 
   const authoritativeState = fullPayload?.gameState ?? currentGameState;
 
@@ -918,11 +923,14 @@ export default function MRFCollectionPage() {
                       handleAssignGradeAndPrice={handleAssignGradeAndPrice}
                     />
                   ) : pendingActionChoice === 'municipality' ? (
-                    <MRFSendBackAction
+                                        <MRFSendBackAction
                       budget={myTeam?.budget ?? 0}
                       selectedAuction={selectedItem}
                       onSendBack={handleSendBackToMunicipality}
+                      fastDurationSeconds={fastTransportDurationSeconds}
+                      slowDurationSeconds={slowTransportDurationSeconds}
                     />
+
                   ) : null}
                 </div>
               ) : null}

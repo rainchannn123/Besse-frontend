@@ -31,11 +31,25 @@ const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> = ({
 }) => {
   const [students, setStudents] = useState<CSVStudent[]>([]);
   const [results, setResults] = useState<RegistrationResult[]>([]);
-  const [isProcessing, setIsProcessing] = useState(false);
+    const [isProcessing, setIsProcessing] = useState(false);
   const [step, setStep] = useState<'upload' | 'review' | 'results'>('upload');
-  const [dragActive, setDragActive] = useState(false);
+    const [dragActive, setDragActive] = useState(false);
+  const [textareaContent, setTextareaContent] = useState('');
+
+  const sampleCSV = `Course Name,Role,Student Name,EID,Email
+SLC1005,Student,CHAN Tai Man,tmchan123,tchan1@test.com
+SFE1005,Student,LEE Ming Fung,mflee123,mflee@test.com`;
+
+  const handleCopySampleCSV = async () => {
+    try {
+      await navigator.clipboard.writeText(sampleCSV);
+    } catch (error) {
+      console.error('Failed to copy sample CSV:', error);
+    }
+  };
 
   if (!isOpen) return null;
+
 
   const parseCSV = (content: string): CSVStudent[] => {
     const lines = content.trim().split('\n');
@@ -118,14 +132,18 @@ const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> = ({
     }
   };
 
-  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const content = e.target.value;
-    if (content && content.trim()) {
-      const parsed = parseCSV(content);
+    const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setTextareaContent(e.target.value);
+  };
+
+  const handleTextareaSubmit = () => {
+    if (textareaContent && textareaContent.trim()) {
+      const parsed = parseCSV(textareaContent);
       setStudents(parsed);
       setStep('review');
     }
   };
+
 
   const handleRegisterAll = async () => {
     setIsProcessing(true);
@@ -203,12 +221,14 @@ const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> = ({
     }
   };
 
-  const handleReset = () => {
+    const handleReset = () => {
     setStudents([]);
     setResults([]);
     setStep('upload');
     setIsProcessing(false);
+    setTextareaContent('');
   };
+
 
   const successCount = results.filter(r => r.status === 'success').length;
   const failedCount = results.filter(r => r.status === 'failed').length;
@@ -238,7 +258,7 @@ const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> = ({
                 Course Name, Role, Student Name, EID, Email
               </div>
               <p className="text-gray-500 text-sm mb-4">
-                Example: SLC1005, Student, CHAN Tai Man, 70281222, tchan1@test.com
+                Example: SLC1005, Student, CHAN Tai Man, tmchan123, tchan1@test.com
               </p>
               
               <div
@@ -274,17 +294,35 @@ const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> = ({
               </div>
 
               <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Or paste CSV content:
-                </label>
+                                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Or paste CSV content:
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleCopySampleCSV}
+                    className="text-sm text-[#50704C] hover:underline"
+                  >
+                    Copy sample format
+                  </button>
+                </div>
                 <textarea
                   rows={6}
                   className="w-full border border-gray-300 rounded-md p-3 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-[#50704C]"
-                  placeholder='Course Name,Role,Student Name,EID,Email
-SLC1005,Student,CHAN Tai Man,70281222,tchan1@test.com
-SFE1005,Student,LEE Ming Fung,70281217,mflee@test.com'
+                  placeholder="Paste your CSV content here"
+                  value={textareaContent}
                   onChange={handleTextareaChange}
                 ></textarea>
+
+                <button
+                  type="button"
+                  onClick={handleTextareaSubmit}
+                  disabled={!textareaContent.trim()}
+                  className="mt-3 px-4 py-2 bg-[#50704C] text-white rounded-md hover:bg-[#3A7D2C] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Submit Registration
+                </button>
+
               </div>
             </div>
           )}

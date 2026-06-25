@@ -85,7 +85,7 @@ const ProcessedNotListedChart: React.FC<ProcessedNotListedChartProps> = ({ data 
   return (
     <div className="w-full">
       <h4 className="text-center font-semibold text-[#33552C] text-sm mb-3">
-        Processed (Not Listed)
+        Recycled Materials from Waste
       </h4>
       {hasData ? (
         <>

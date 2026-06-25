@@ -63,11 +63,14 @@ const CATEGORY_COLOR: Record<ActivityCategory, string> = {
   system: 'bg-gray-100 text-gray-800',
 };
 
+const LOG_WINDOW_HOURS = 3;
+
 const formatDateTime = (iso: string): string => {
   const date = new Date(iso);
   if (isNaN(date.getTime())) return iso;
   return date.toLocaleString();
 };
+
 
 const ActivityLogModal: React.FC<ActivityLogModalProps> = ({ isOpen, onClose }) => {
   const [logs, setLogs] = useState<ActivityLogEntry[]>([]);
@@ -92,13 +95,20 @@ const ActivityLogModal: React.FC<ActivityLogModalProps> = ({ isOpen, onClose }) 
     setLoading(true);
     setError(null);
     try {
+            const now = Date.now();
+      const fromDate = new Date(now - LOG_WINDOW_HOURS * 60 * 60 * 1000).toISOString();
+      const toDate = new Date(now).toISOString();
+
       const response = await adminService.getActivityLogs({
         page,
         limit,
         category: category || undefined,
         status: status || undefined,
         search: search || undefined,
+        fromDate,
+        toDate,
       });
+
 
       if (response.success && response.data) {
         setLogs(response.data.logs);
@@ -177,9 +187,10 @@ const ActivityLogModal: React.FC<ActivityLogModalProps> = ({ isOpen, onClose }) 
             </div>
             <div>
               <h2 className="text-xl font-bold text-[#4f2d14]">Activity Log</h2>
-              <p className="text-xs text-[#7a5f41]">
-                Audit trail of every action performed across the platform
+                            <p className="text-xs text-[#7a5f41]">
+                Showing activity from the last {LOG_WINDOW_HOURS} hours
               </p>
+
             </div>
           </div>
           <div className="flex items-center gap-2">

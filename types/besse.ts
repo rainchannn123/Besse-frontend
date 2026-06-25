@@ -50,9 +50,12 @@ export interface GameConstants {
   CO2_FACTOR_LANDFILL: number; // 2.5 tons per ton
 
   // Costs (UPDATED to match manual exactly)
-  TRANSPORT_COST_PER_TON_KM: number; // $2.50 / ton / km
+    TRANSPORT_COST_PER_TON_KM: number; // $2.50 / ton / km
+  TRANSPORT_FAST_DURATION_SECONDS: number;
+  TRANSPORT_SLOW_DURATION_SECONDS: number;
   DUMPING_FEE: number; // $50 / ton
   OPERATING_COST: number; // $500 / shift
+
 
   // Material Properties (UPDATED to match manual table exactly - includes Wood)
   MATERIAL_PROPERTIES: {

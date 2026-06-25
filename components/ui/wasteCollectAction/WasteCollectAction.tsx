@@ -17,8 +17,11 @@ interface WasteCollectActionProps {
   maxCapacity?: number;
   selectedBatch?: WasteBatch | null;
   handleCollectWaste?: (mode: 'fast' | 'slow') => void;
-  transportCostPerTon?: number;
+    transportCostPerTon?: number;
+  fastDurationSeconds?: number;
+  slowDurationSeconds?: number;
 }
+
 
 export const WasteCollectAction: React.FC<WasteCollectActionProps> = ({
   budget = 0,
@@ -27,7 +30,10 @@ export const WasteCollectAction: React.FC<WasteCollectActionProps> = ({
   maxCapacity = 0,
   selectedBatch,
   handleCollectWaste,
+  fastDurationSeconds = 20,
+  slowDurationSeconds = 40,
 }) => {
+
   const [selectedMode, setSelectedMode] = useState<'fast' | 'slow' | null>(null);
   const [isCollecting, setIsCollecting] = useState(false);
 
@@ -114,7 +120,8 @@ export const WasteCollectAction: React.FC<WasteCollectActionProps> = ({
                   <Zap className="h-5 w-5 text-orange-500" />
                   <span className="font-bold text-orange-600">Fast</span>
                 </div>
-                <p className="text-xs text-gray-600">30 seconds</p>
+                  <p className="text-xs text-gray-600">{fastDurationSeconds} seconds</p>
+
                 <p className={`text-sm font-bold ${hasEnoughBudgetFast ? 'text-green-600' : 'text-red-500'}`}>
                   ${fastCost.toFixed(0)}
                 </p>
@@ -135,7 +142,8 @@ export const WasteCollectAction: React.FC<WasteCollectActionProps> = ({
                   <Clock className="h-5 w-5 text-green-500" />
                   <span className="font-bold text-green-600">Slow</span>
                 </div>
-                <p className="text-xs text-gray-600">60 seconds</p>
+                  <p className="text-xs text-gray-600">{slowDurationSeconds} seconds</p>
+
                 <p className={`text-sm font-bold ${hasEnoughBudgetSlow ? 'text-green-600' : 'text-red-500'}`}>
                   ${slowCost.toFixed(0)}
                 </p>

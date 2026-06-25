@@ -18,13 +18,19 @@ interface MRFSendBackActionProps {
   budget?: number;
   selectedAuction?: PendingAuctionLike | null;
   onSendBack?: (mode: 'fast' | 'slow') => Promise<void> | void;
+  fastDurationSeconds?: number;
+  slowDurationSeconds?: number;
 }
 
+
 export const MRFSendBackAction: React.FC<MRFSendBackActionProps> = ({
-  budget = 0,
+    budget = 0,
   selectedAuction,
   onSendBack,
+  fastDurationSeconds = 20,
+  slowDurationSeconds = 40,
 }) => {
+
   const [selectedMode, setSelectedMode] = useState<'fast' | 'slow' | null>(null);
   const [isSending, setIsSending] = useState(false);
 
@@ -85,7 +91,8 @@ export const MRFSendBackAction: React.FC<MRFSendBackActionProps> = ({
               <Zap className="h-5 w-5 text-orange-500" />
               <span className="font-bold text-orange-600">Fast</span>
             </div>
-            <p className="text-xs text-gray-600">30 seconds</p>
+               <p className="text-xs text-gray-600">{fastDurationSeconds} seconds</p>
+
             <p className={`text-sm font-bold ${hasEnoughBudgetFast ? 'text-green-600' : 'text-red-500'}`}>
               ${fastCost.toFixed(0)}
             </p>
@@ -103,7 +110,8 @@ export const MRFSendBackAction: React.FC<MRFSendBackActionProps> = ({
               <Clock className="h-5 w-5 text-green-500" />
               <span className="font-bold text-green-600">Slow</span>
             </div>
-            <p className="text-xs text-gray-600">60 seconds</p>
+                <p className="text-xs text-gray-600">{slowDurationSeconds} seconds</p>
+
             <p className={`text-sm font-bold ${hasEnoughBudgetSlow ? 'text-green-600' : 'text-red-500'}`}>
               ${slowCost.toFixed(0)}
             </p>

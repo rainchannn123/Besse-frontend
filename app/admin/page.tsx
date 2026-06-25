@@ -147,7 +147,7 @@ export default function AdminMonitorPage() {
 
       if (data.success) {
         addNotification({
-          message: `✅ Game started for room ${roomCode}!`,
+          message: `✅ Game started for room ${roomCode}! Redirecting to dashboard...`,
           type: 'success',
         });
         loadOverview(true);
@@ -290,12 +290,16 @@ export default function AdminMonitorPage() {
 
       if (startResponse.ok && startData.success) {
         addNotification({
-          message: `✅ Game started for "${teamName}"!`,
+          message: `✅ Game started for "${teamName}"! Redirecting to dashboard...`,
           type: 'success',
         });
         await loadOverview(true);
         await fetchRooms();
+        setTimeout(() => {
+          router.push('/dashboard/matchmaking-lobby');
+        }, 1200);
       } else {
+
         addNotification({
           message: startData.message || 'Failed to start game',
           type: 'error',
@@ -461,10 +465,9 @@ export default function AdminMonitorPage() {
               </button>
               <button
                 onClick={() => setShowActivityLogModal(true)}
-                className="flex items-center gap-2 rounded-lg border border-[#5b7f3b] bg-[#eef8e4] px-4 py-2 text-[#2e4a1f] font-semibold hover:bg-[#dff0d0]"
+                className="flex items-center gap-2 rounded-lg border border-[#5b7f3b] px-4 py-2 text-[#2e4a1f] font-semibold hover:bg-[#dff0d0]"
                 title="View audit trail of all platform activity"
               >
-                <span className="text-base leading-none">📋</span>
                 Activity Log
               </button>
               <button
@@ -707,8 +710,8 @@ export default function AdminMonitorPage() {
             </div>
           </section>
 
-          {/* Active Match Groups */}
-          <section className="rounded-2xl border border-[#d3c4ad] bg-[#fff9ef] p-5 shadow-sm">
+          {/* Active Match Groups */} 
+          {/* <section className="rounded-2xl border border-[#d3c4ad] bg-[#fff9ef] p-5 shadow-sm">
             <h2 className="text-xl font-bold text-[#4f2d14] mb-4">Active Match Groups</h2>
             {overview.matchGroups.length === 0 ? (
               <p className="text-[#6d4b2a]">No pair groups found.</p>
@@ -760,7 +763,7 @@ export default function AdminMonitorPage() {
                 ))}
               </div>
             )}
-          </section>
+          </section> */}
 
           {/* ✅ Created Game Rooms - Admin Rooms */}
           <section className="rounded-2xl border border-[#d3c4ad] bg-[#fff9ef] p-5 shadow-sm">

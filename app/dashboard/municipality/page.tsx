@@ -479,8 +479,13 @@ export default function MunicipalityPage() {
     } catch {}
     return 15;
   };
-  const totalDurMin = getDurationMinutes();
+    const totalDurMin = getDurationMinutes();
+  const fastTransportDurationSeconds =
+    currentGameState?.constants?.TRANSPORT_FAST_DURATION_SECONDS ?? 20;
+  const slowTransportDurationSeconds =
+    currentGameState?.constants?.TRANSPORT_SLOW_DURATION_SECONDS ?? 40;
   const staticLogData: { time: string; message: string }[] = [];
+
 
     const selectableMaterials = myTeam?.municipalInventory
     ? Object.entries(myTeam.municipalInventory)
@@ -617,10 +622,11 @@ export default function MunicipalityPage() {
       );
       
       if (response.success) {
-        addNotification({
-          message: `${mode.toUpperCase()} transport started! Waste will arrive in ${mode === 'fast' ? '30' : '60'} seconds.`,
+                addNotification({
+          message: `${mode.toUpperCase()} transport started! Waste will arrive in ${mode === 'fast' ? fastTransportDurationSeconds : slowTransportDurationSeconds} seconds.`,
           type: 'success',
         });
+
                 setSelectedItem(null);
         setSelectedBatch(null);
         setSelectedWasteBatchId(null);
@@ -952,10 +958,13 @@ export default function MunicipalityPage() {
                     maxCapacity={150}
                     selectedBatch={effectiveSelectedBatch}
                     handleCollectWaste={handleCollectWasteWithTransport}
-                    transportCostPerTon={
+                                        transportCostPerTon={
                       (currentGameState?.constants?.FIXED_DISTANCE_TO_MRF_KM ?? 10) *
                       (currentGameState?.constants?.TRANSPORT_COST_PER_TON_KM ?? 2.5)
                     }
+                    fastDurationSeconds={fastTransportDurationSeconds}
+                    slowDurationSeconds={slowTransportDurationSeconds}
+
                   />
                 ) : null
               ) : selectedMaterial ? (

@@ -53,8 +53,12 @@ const TransportProgressList: React.FC<TransportProgressListProps> = ({ transport
     <div className="space-y-1.5">
       {transports.map((transport) => {
         const isFast = transport.mode === 'fast';
-        const totalDuration = isFast ? 30 : 60;
+        const totalDuration = Math.max(
+          1,
+          Math.ceil((transport.endTime - transport.startTime) / 1000)
+        );
         const remaining = Math.max(0, Math.ceil((transport.endTime - now) / 1000));
+
         const progress = totalDuration > 0 ? (remaining / totalDuration) * 100 : 0;
         const meta = getTransportMeta(transport);
 
