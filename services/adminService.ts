@@ -8,6 +8,8 @@ import {
   AdminLoginResponse,
   AdminOverviewResponse,
   AdminPlayerHistoryResponse,
+  AdminRoomLiveOverviewQuery,
+  AdminRoomLiveOverviewResponse,
 } from '@/types/admin';
 
 const DEFAULT_API_BASE_URL = 'http://localhost:5000/api';
@@ -69,9 +71,9 @@ export const adminService = {
         }
       );
 
-      console.log('📦 Admin login response:', response.data);
+            console.log('📦 Admin login response:', response.data);
 
-            if (response.data.success && response.data.data?.token) {
+      if (response.data.success && response.data.data?.token) {
         secureStorage.setItem(ADMIN_TOKEN_KEY, response.data.data.token);
 
         if (typeof window !== 'undefined') {
@@ -119,34 +121,31 @@ export const adminService = {
       console.error('❌ Failed to force exit player:', error.message);
       throw error;
     }
-  },
+    },
 
-    logout(): void {
+  logout(): void {
     console.log('🔓 Admin logout');
     secureStorage.removeItem(ADMIN_TOKEN_KEY);
 
     if (typeof window !== 'undefined') {
       localStorage.removeItem(ADMIN_TOKEN_KEY);
     }
-  },
+    },
 
-
-    hasToken(): boolean {
+  hasToken(): boolean {
     const secureToken = secureStorage.getItem(ADMIN_TOKEN_KEY);
     const localToken = typeof window !== 'undefined' ? localStorage.getItem(ADMIN_TOKEN_KEY) : null;
     const token = secureToken || localToken;
 
     console.log(`🔍 Has admin token: ${!!token}`);
     return Boolean(token);
-  },
+    },
 
-
-    getToken(): string | null {
+  getToken(): string | null {
     const secureToken = secureStorage.getItem(ADMIN_TOKEN_KEY);
     const localToken = typeof window !== 'undefined' ? localStorage.getItem(ADMIN_TOKEN_KEY) : null;
     return secureToken || localToken;
-  },
-
+    },
 
   async getPlayerHistory(
     userId: string,
@@ -166,7 +165,36 @@ export const adminService = {
     }
   },
 
-  async getActivityLogs(
+  async getRoomLiveOverview(
+    roomCode: string,
+    query: AdminRoomLiveOverviewQuery = {}
+  ): Promise<AdminRoomLiveOverviewResponse> {
+    try {
+      const normalizedRoomCode = roomCode.trim().toUpperCase();
+      const params: Record<string, string | number | boolean> = {};
+
+      if (typeof query.flowLimit === 'number' && Number.isFinite(query.flowLimit)) {
+        params.flowLimit = query.flowLimit;
+      }
+      if (query.flowFrom) params.flowFrom = query.flowFrom;
+      if (query.flowTo) params.flowTo = query.flowTo;
+      if (typeof query.includeFlowEvents === 'boolean') {
+        params.includeFlowEvents = query.includeFlowEvents;
+      }
+
+      const response = await adminApi.get<AdminRoomLiveOverviewResponse>(
+        `/admin/monitor/rooms/${normalizedRoomCode}/live-overview`,
+        { params }
+      );
+
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Failed to fetch room live overview:', error.message);
+      throw error;
+    }
+  },
+
+    async getActivityLogs(
     filters: ActivityLogFilters = {}
   ): Promise<ActivityLogListResponse> {
     try {

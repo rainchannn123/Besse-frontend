@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useNotificationStore } from '@/stores/notificationStore';
-import { Copy, Users, Crown, Play, ArrowLeft } from 'lucide-react';
+import { Copy, Users, Crown, Play, ArrowLeft, BarChart3 } from 'lucide-react';
 import CustomHeader from '@/components/layout/header/customheader/CustomHeader';
 import woodenBg from '@/public/assets/images/wooden_bg.png';
 import woodenHeading from '@/public/assets/images/woodenHeading.png';
@@ -78,9 +78,16 @@ export default function AdminGameRoomPage() {
       console.log('[AdminGameRoom] Response status:', response.status);
       console.log('[AdminGameRoom] Response data:', data);
       
-      if (data.success) {
-        setRoomData(data.data.room);
-        setTeamCount(data.data.room.teams?.length || 0);
+            if (data.success) {
+        const fetchedRoom = data.data.room as GameRoomData;
+
+        if (fetchedRoom.status === 'started') {
+          router.replace(`/dashboard/admin-game-room/${roomCode}/live`);
+          return;
+        }
+
+        setRoomData(fetchedRoom);
+        setTeamCount(fetchedRoom.teams?.length || 0);
       } else {
         if (response.status === 401 || response.status === 403) {
           console.log('[AdminGameRoom] Unauthorized, redirecting to login');
@@ -159,14 +166,12 @@ export default function AdminGameRoomPage() {
       });
       const data = await response.json();
 
-      if (data.success) {
+            if (data.success) {
         addNotification({
-          message: `✅ Game started for ${currentTeamCount} teams!`,
+          message: `Game started for ${currentTeamCount} teams. Redirecting to live monitor...`,
           type: 'success',
         });
-        setTimeout(() => {
-          router.push('/admin');
-        }, 3000);
+        router.replace(`/dashboard/admin-game-room/${roomCode}/live`);
       } else {
         addNotification({
           message: data.message || 'Failed to start game',
@@ -214,7 +219,8 @@ export default function AdminGameRoomPage() {
     );
   }
 
-  const canStart = teamCount >= 2;
+  const isRoomStarted = roomData.status === 'started';
+  const canStart = teamCount >= 2 && !isRoomStarted;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#efe4d2] via-[#f8f1e6] to-[#e8dcc7] p-4 md:p-8">
@@ -250,11 +256,20 @@ export default function AdminGameRoomPage() {
                   👑 Admin Room
                 </span>
               </div>
-              <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-3">
                 <span className="text-sm text-[#6d4b2a]">
                   <Users size={16} className="inline mr-1" />
                   {teamCount}/{roomData.maxTeams || 30} teams
                 </span>
+                {isRoomStarted && (
+                  <button
+                    onClick={() => router.push(`/dashboard/admin-game-room/${roomCode}/live`)}
+                    className="inline-flex items-center gap-2 rounded-md bg-[#50704C] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#3A7D2C]"
+                  >
+                    <BarChart3 size={14} />
+                    Open Live Monitor
+                  </button>
+                )}
               </div>
             </div>
 
@@ -333,10 +348,10 @@ export default function AdminGameRoomPage() {
                     <span className="animate-spin inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full"></span>
                     Starting...
                   </>
-                ) : teamCount < 2 ? (
+                                ) : teamCount < 2 ? (
                   `Need ${2 - teamCount} more team(s) to start`
                 ) : (
-                  `🎮 Start Game (${teamCount} teams)`
+                  `Start Game (${teamCount} teams)`
                 )}
               </button>
             </div>
@@ -349,11 +364,26 @@ export default function AdminGameRoomPage() {
               </div>
             )}
 
-            {teamCount >= 2 && (
+                        {teamCount >= 2 && !isRoomStarted && (
               <div className="text-center p-4 bg-green-50 rounded-lg border border-green-200">
                 <p className="text-green-700">
-                  ✅ {teamCount} teams have joined! Click Start Game to begin.
+                  {teamCount} teams have joined. Click Start Game to begin.
                 </p>
+              </div>
+            )}
+
+            {isRoomStarted && (
+              <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <p className="text-blue-700 font-medium">
+                  This room is already in progress.
+                </p>
+                <button
+                  onClick={() => router.push(`/dashboard/admin-game-room/${roomCode}/live`)}
+                  className="mt-3 inline-flex items-center gap-2 rounded-md bg-[#50704C] px-4 py-2 text-sm font-semibold text-white hover:bg-[#3A7D2C]"
+                >
+                  <BarChart3 size={16} />
+                  Go to Live Monitor
+                </button>
               </div>
             )}
           </div>

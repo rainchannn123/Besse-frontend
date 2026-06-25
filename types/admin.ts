@@ -1,4 +1,4 @@
-import { ApiResponse } from './besse';
+import { ApiResponse, MaterialType } from './besse';
 
 export type AdminPlayerStatus =
   | 'offline'
@@ -126,8 +126,144 @@ export interface AdminPlayerHistoryData {
 export interface AdminPlayerHistoryResponse extends ApiResponse<AdminPlayerHistoryData> {}
 
 // ─────────────────────────────────────────────────────────────
+// Room Live Overview (v2)
+// ─────────────────────────────────────────────────────────────
+
+export type AdminRoomStatus = 'waiting' | 'ready' | 'started' | 'completed';
+
+export interface AdminMaterialAmountMap {
+  paper: number;
+  metal: number;
+  plastic: number;
+  wood: number;
+  glass: number;
+}
+
+export interface AdminRoomLiveOverview {
+  roomCode: string;
+  room: {
+    roomCode: string;
+    roomName: string;
+    status: AdminRoomStatus;
+    isAdminRoom: boolean;
+    startedAt: string | null;
+    elapsedMs: number;
+    elapsedSeconds: number;
+    totalDurationSeconds: number;
+    remainingSeconds: number;
+    isExpired: boolean;
+    createdAt: string | null;
+    updatedAt: string | null;
+  };
+  globalMetrics: {
+    totalTeams: number;
+    avgHealth: number;
+    avgCO2: number;
+    avgBudget: number;
+    totalHealth?: number;
+    totalCO2?: number;
+    totalBudget?: number;
+    totalCompletedProjects: number;
+    activeTeams: number;
+    completedTeams: number;
+    eliminatedTeams: number;
+    connectedTeams: number;
+    disconnectedTeams: number;
+  };
+  teams: Array<{
+    teamId: string;
+    sessionId: string;
+    citySlot: number;
+    teamName: string;
+    players: {
+      municipality: string;
+      mrf: string;
+      broker: string;
+    };
+    gameStatus: string;
+    isEliminated: boolean;
+    eliminationReason: string | null;
+    rank: number;
+    metrics: {
+      health: number;
+      wallet: number;
+      budget: number;
+      totalCO2: number;
+      completedProjects: number;
+      totalProjectScore: number;
+      wasteInventory: number;
+      totalLandfillTons: number;
+      minutesElapsed: number;
+    };
+    materialFlowSummary: {
+      inByType: AdminMaterialAmountMap;
+      outByType: AdminMaterialAmountMap;
+      currentInventoryByType: AdminMaterialAmountMap;
+      wasteByType: AdminMaterialAmountMap;
+      projectUsedByType: AdminMaterialAmountMap;
+      landfillByType: AdminMaterialAmountMap;
+      totalIn: number;
+      totalOut: number;
+      currentInventoryTotal: number;
+      totalWasteLogged: number;
+      totalProjectUsed: number;
+      totalLandfill: number;
+    };
+    connection: {
+      connectedClients: number;
+      hasActiveSocketConnections: boolean;
+      isDisconnected: boolean;
+    };
+  }>;
+  rankings: Array<{
+    rank: number;
+    teamId: string;
+    sessionId: string;
+    citySlot: number;
+    teamName: string;
+    totalProjectScore: number;
+    health: number;
+    totalCO2: number;
+    gameStatus: string;
+  }>;
+  snapshot: unknown;
+  materialFlowEvents: Array<{
+    roomCode: string;
+    teamId: string;
+    sessionId: string;
+    citySlot: number;
+    flowClass: 'material' | 'waste';
+    source: string;
+    destination: string;
+    materialType: MaterialType;
+    amount: number;
+    eventAt: string;
+    metadata?: Record<string, unknown>;
+  }>;
+  flowQuery?: {
+    flowLimit: number;
+    flowFrom: string | null;
+    flowTo: string | null;
+    includeFlowEvents: boolean;
+  };
+  warnings?: string[];
+  generatedAt: string;
+  contractVersion: 'admin-room-live-overview/v2';
+}
+
+export interface AdminRoomLiveOverviewQuery {
+  flowLimit?: number;
+  flowFrom?: string;
+  flowTo?: string;
+  includeFlowEvents?: boolean;
+}
+
+export type AdminRoomLiveOverviewResponse = ApiResponse<AdminRoomLiveOverview>;
+
+// ─────────────────────────────────────────────────────────────
 // Activity Log types
 // ─────────────────────────────────────────────────────────────
+
 
 export type ActivityCategory =
   | 'auth'

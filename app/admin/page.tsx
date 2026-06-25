@@ -114,20 +114,31 @@ export default function AdminMonitorPage() {
     }
   };
 
-  const fetchRooms = useCallback(async () => {
+    const fetchRooms = useCallback(async () => {
     try {
       const adminToken = getAdminToken();
-      const response = await fetch(`${API_URL}/matchmaking/rooms`, {
+      if (!adminToken) {
+        return;
+      }
+
+      const response = await fetch(`${API_URL}/matchmaking/rooms/all`, {
         headers: { Authorization: `Bearer ${adminToken}` },
       });
       const data = await response.json();
+
+      if (response.status === 401 || response.status === 403) {
+        adminService.logout();
+        router.push('/auth/login');
+        return;
+      }
+
       if (data.success) {
         setRooms(data.data?.rooms || []);
       }
     } catch (error) {
       console.error('Failed to fetch rooms:', error);
     }
-  }, [API_URL]);
+  }, [API_URL, router]);
 
   const handleStartGameFromAdmin = async (roomCode: string) => {
     const confirmStart = confirm(`Start game for room ${roomCode}?`);
@@ -145,13 +156,14 @@ export default function AdminMonitorPage() {
       });
       const data = await response.json();
 
-      if (data.success) {
+            if (data.success) {
         addNotification({
-          message: `✅ Game started for room ${roomCode}! Redirecting to dashboard...`,
+          message: `Game started for room ${roomCode}. Redirecting to live monitor...`,
           type: 'success',
         });
-        loadOverview(true);
-        fetchRooms();
+        await loadOverview(true);
+        await fetchRooms();
+        router.push(`/dashboard/admin-game-room/${roomCode}/live`);
       } else {
         addNotification({
           message: data.message || 'Failed to start game',
@@ -767,7 +779,7 @@ export default function AdminMonitorPage() {
 
           {/* ✅ Created Game Rooms - Admin Rooms */}
           <section className="rounded-2xl border border-[#d3c4ad] bg-[#fff9ef] p-5 shadow-sm">
-            <h2 className="text-xl font-bold text-[#4f2d14] mb-4">🏠 Created Game Rooms</h2>
+            <h2 className="text-xl font-bold text-[#4f2d14] mb-4">Created Game Rooms</h2>
             
             {rooms.length === 0 ? (
               <p className="text-[#6d4b2a]">No rooms created yet.</p>
@@ -823,8 +835,8 @@ export default function AdminMonitorPage() {
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex gap-2">
-                              <button
-                                onClick={() => window.location.href = `/dashboard/admin-game-room/${room.roomCode}`}
+                                                            <button
+                                onClick={() => router.push(`/dashboard/admin-game-room/${room.roomCode}`)}
                                 className="px-3 py-1 bg-[#50704C] text-white rounded-md hover:bg-[#3A7D2C] transition-colors text-xs font-semibold"
                               >
                                 View Room
@@ -835,6 +847,14 @@ export default function AdminMonitorPage() {
                                   className="px-3 py-1 bg-[#3A7D2C] text-white rounded-md hover:bg-[#2d6322] transition-colors text-xs font-semibold"
                                 >
                                   Start Game
+                                </button>
+                              )}
+                              {room.status === 'started' && (
+                                <button
+                                  onClick={() => router.push(`/dashboard/admin-game-room/${room.roomCode}/live`)}
+                                  className="px-3 py-1 bg-[#2c5b8e] text-white rounded-md hover:bg-[#224a73] transition-colors text-xs font-semibold"
+                                >
+                                  Live Monitor
                                 </button>
                               )}
                             </div>

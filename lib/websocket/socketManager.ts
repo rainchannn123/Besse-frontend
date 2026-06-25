@@ -36,6 +36,8 @@ export type GameEvent =
   | 'countdown-cancelled'
   | 'error'
   | 'external-purchase'
+  | 'joined-admin-monitor-room'
+  | 'admin:room-telemetry-updated'
   | string;
 
 // Define specific callback types
@@ -217,7 +219,7 @@ class SocketManager {
     this.lastJoinedSocketId = socketId;
   }
 
-  leaveGame(sessionId: string): void {
+    leaveGame(sessionId: string): void {
     if (this.socket?.connected) {
       this.socket.emit('leave-game', { sessionId });
     }
@@ -233,7 +235,22 @@ class SocketManager {
     }
   }
 
+  joinAdminMonitorRoom(roomCode: string): void {
+    const normalizedRoomCode = String(roomCode || '').trim().toUpperCase();
+    if (!normalizedRoomCode || !this.socket?.connected) return;
+
+    this.socket.emit('join-admin-monitor-room', { roomCode: normalizedRoomCode });
+  }
+
+  leaveAdminMonitorRoom(roomCode: string): void {
+    const normalizedRoomCode = String(roomCode || '').trim().toUpperCase();
+    if (!normalizedRoomCode || !this.socket?.connected) return;
+
+    this.socket.emit('leave-admin-monitor-room', { roomCode: normalizedRoomCode });
+  }
+
   // Game actions
+
   collectWaste(data: any): void {
     this.emit('collect-waste', data);
   }
