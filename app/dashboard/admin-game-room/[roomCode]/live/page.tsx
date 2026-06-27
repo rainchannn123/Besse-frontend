@@ -56,6 +56,8 @@ export default function AdminRoomLiveMonitorPage() {
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
 
   const pushRefreshTimeoutRef = useRef<number | null>(null);
+  const countdownTargetTimestampRef = useRef<number | null>(null);
+
 
   const fetchLiveOverview = useCallback(
     async (silent = false) => {
@@ -81,8 +83,12 @@ export default function AdminRoomLiveMonitorPage() {
           throw new Error(response.message || 'Failed to load room live overview');
         }
 
+        const remainingSeconds = Math.max(0, response.data.room.remainingSeconds);
+
         setOverview(response.data);
-        setDisplayRemainingSeconds(response.data.room.remainingSeconds);
+        setDisplayRemainingSeconds(remainingSeconds);
+        countdownTargetTimestampRef.current = Date.now() + remainingSeconds * 1000;
+
       } catch (error: unknown) {
         const message = getErrorMessage(error);
         setErrorMessage(message);
@@ -160,22 +166,16 @@ export default function AdminRoomLiveMonitorPage() {
 
   useEffect(() => {
     const countdownInterval = window.setInterval(() => {
-      setDisplayRemainingSeconds((prev) => Math.max(0, prev - 1));
-    }, 1000);
+      const targetTimestamp = countdownTargetTimestampRef.current;
+      if (targetTimestamp === null) return;
+
+      const secondsLeft = Math.max(0, Math.ceil((targetTimestamp - Date.now()) / 1000));
+      setDisplayRemainingSeconds((prev) => (prev === secondsLeft ? prev : secondsLeft));
+    }, 250);
 
     return () => window.clearInterval(countdownInterval);
   }, []);
 
-  useEffect(() => {
-    if (!overview) return;
-
-    const serverValue = overview.room.remainingSeconds;
-    const drift = Math.abs(serverValue - displayRemainingSeconds);
-
-    if (drift >= 2) {
-      setDisplayRemainingSeconds(serverValue);
-    }
-  }, [displayRemainingSeconds, overview]);
 
   const warningMessages = overview?.warnings || [];
 
