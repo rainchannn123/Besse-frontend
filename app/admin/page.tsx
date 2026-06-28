@@ -21,6 +21,7 @@ import StudentRegistrationModal from "@/components/admin/StudentRegistrationModa
 import ActivityLogModal from "@/components/admin/ActivityLogModal";
 import {
   clearAdminLiveMonitorState,
+  consumeAdminRoomsRefreshOnReturn,
   isReviewWindowActive,
   readAdminLiveMonitorState,
   setAdminLiveMonitorActive,
@@ -236,11 +237,14 @@ export default function AdminMonitorPage() {
 
   useEffect(() => {
     loadOverview();
-    fetchRooms();
+
+    const shouldRefreshRooms = consumeAdminRoomsRefreshOnReturn();
+    if (shouldRefreshRooms) {
+      fetchRooms();
+    }
 
     const interval = setInterval(() => {
       loadOverview(true);
-      fetchRooms();
     }, 10000);
 
     return () => {
@@ -687,7 +691,10 @@ export default function AdminMonitorPage() {
                 )}
               </button>
               <button
-                onClick={() => loadOverview(true)}
+                onClick={async () => {
+                  await loadOverview(true);
+                  await fetchRooms();
+                }}
                 className="rounded-lg border border-[#5b7f3b] px-4 py-2 text-[#2e4a1f] font-semibold hover:bg-[#eef8e4]"
                 disabled={refreshing}
               >

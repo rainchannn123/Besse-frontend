@@ -14,6 +14,8 @@ import {
 
 const DEFAULT_API_BASE_URL = 'http://localhost:5000/api';
 const ADMIN_TOKEN_KEY = 'admin_monitor_token';
+const ADMIN_API_TIMEOUT_MS = 45000;
+const OVERVIEW_RETRY_DELAY_MS = 1200;
 
 const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_URL?.trim() || DEFAULT_API_BASE_URL
@@ -21,8 +23,9 @@ const API_BASE_URL = (
 
 const adminApi = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 15000,
+  timeout: ADMIN_API_TIMEOUT_MS,
 });
+
 
 // ✅ Request interceptor - try both admin token and regular auth token
 adminApi.interceptors.request.use(
@@ -96,16 +99,39 @@ export const adminService = {
     }
   },
 
-  async getOverview(): Promise<AdminOverviewResponse> {
+    async getOverview(): Promise<AdminOverviewResponse> {
+    const fetchOverviewRequest = () =>
+      adminApi.get<AdminOverviewResponse>('/admin/monitor/overview');
+
     try {
       console.log('📊 Fetching admin overview...');
-      const response = await adminApi.get<AdminOverviewResponse>('/admin/monitor/overview');
+      const response = await fetchOverviewRequest();
       return response.data;
     } catch (error: any) {
+      const isTimeout =
+        error?.code === 'ECONNABORTED' ||
+        String(error?.message || '').toLowerCase().includes('timeout');
+
+      if (isTimeout) {
+        console.warn(
+          `⏳ Overview request timed out. Retrying once in ${OVERVIEW_RETRY_DELAY_MS}ms...`
+        );
+        await new Promise(resolve => setTimeout(resolve, OVERVIEW_RETRY_DELAY_MS));
+
+        try {
+          const retryResponse = await fetchOverviewRequest();
+          return retryResponse.data;
+        } catch (retryError: any) {
+          console.error('❌ Failed to fetch overview after retry:', retryError.message);
+          throw retryError;
+        }
+      }
+
       console.error('❌ Failed to fetch overview:', error.message);
       throw error;
     }
   },
+
 
   async forceExitPlayer(userId: string, reason?: string): Promise<AdminForceExitResponse> {
     try {

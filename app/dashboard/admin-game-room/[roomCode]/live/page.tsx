@@ -5,6 +5,7 @@ import { adminService } from "@/services/adminService";
 import { useNotificationStore } from "@/stores/notificationStore";
 import { AdminRoomLiveOverview } from "@/types/admin";
 import {
+  markAdminRoomsRefreshOnReturn,
   setAdminLiveMonitorActive,
   setAdminLiveMonitorReviewWindow,
 } from "@/utils/adminLiveMonitor";
@@ -73,6 +74,11 @@ export default function AdminRoomLiveMonitorPage() {
   const hasGameEndedRef = useRef(false);
   const roomNameRef = useRef<string>("");
   const [isGameEnded, setIsGameEnded] = useState(false);
+
+  const goBackToAdminDashboard = useCallback(() => {
+    markAdminRoomsRefreshOnReturn();
+    router.push("/admin");
+  }, [router]);
 
   const markGameEnded = useCallback(() => {
     if (hasGameEndedRef.current) return;
@@ -286,7 +292,7 @@ export default function AdminRoomLiveMonitorPage() {
             Retry
           </button>
           <button
-            onClick={() => router.push("/admin")}
+            onClick={goBackToAdminDashboard}
             className="rounded-lg border border-[#50704C] px-4 py-2 text-[#33552C] font-semibold"
           >
             Back to Admin Dashboard
@@ -309,7 +315,7 @@ export default function AdminRoomLiveMonitorPage() {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="space-y-2">
               <button
-                onClick={() => router.push("/admin")}
+                onClick={goBackToAdminDashboard}
                 className="inline-flex items-center gap-2 text-[#50704C] hover:text-[#33552C]"
               >
                 <ArrowLeft size={16} />

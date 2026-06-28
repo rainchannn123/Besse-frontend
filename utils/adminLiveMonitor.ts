@@ -1,4 +1,5 @@
 const ADMIN_LIVE_MONITOR_STORAGE_KEY = "admin_live_monitor_resume";
+const ADMIN_ROOMS_REFRESH_ON_RETURN_KEY = "admin_rooms_refresh_on_return";
 const REVIEW_WINDOW_MS = 5 * 60 * 1000;
 
 export interface AdminLiveMonitorResumeState {
@@ -87,3 +88,21 @@ export const isReviewWindowActive = (
 };
 
 export const getReviewWindowMs = (): number => REVIEW_WINDOW_MS;
+
+export const markAdminRoomsRefreshOnReturn = (): void => {
+  if (!canUseStorage()) return;
+  localStorage.setItem(ADMIN_ROOMS_REFRESH_ON_RETURN_KEY, "1");
+};
+
+export const consumeAdminRoomsRefreshOnReturn = (): boolean => {
+  if (!canUseStorage()) return false;
+
+  const shouldRefresh =
+    localStorage.getItem(ADMIN_ROOMS_REFRESH_ON_RETURN_KEY) === "1";
+
+  if (shouldRefresh) {
+    localStorage.removeItem(ADMIN_ROOMS_REFRESH_ON_RETURN_KEY);
+  }
+
+  return shouldRefresh;
+};
