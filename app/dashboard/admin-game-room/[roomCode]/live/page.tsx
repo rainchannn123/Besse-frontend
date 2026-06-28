@@ -1,27 +1,38 @@
-'use client';
+"use client";
 
-import { socketManager } from '@/lib/websocket/socketManager';
-import { adminService } from '@/services/adminService';
-import { useNotificationStore } from '@/stores/notificationStore';
-import { AdminRoomLiveOverview } from '@/types/admin';
-import { ArrowLeft, Clock3, RefreshCw, Wifi, WifiOff } from 'lucide-react';
-import { useParams, useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { socketManager } from "@/lib/websocket/socketManager";
+import { adminService } from "@/services/adminService";
+import { useNotificationStore } from "@/stores/notificationStore";
+import { AdminRoomLiveOverview } from "@/types/admin";
+import {
+  setAdminLiveMonitorActive,
+  setAdminLiveMonitorReviewWindow,
+} from "@/utils/adminLiveMonitor";
+
+import { ArrowLeft, Clock3, RefreshCw, Wifi, WifiOff } from "lucide-react";
+import { useParams, useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const POLL_INTERVAL_MS = 4000;
 const PUSH_REFRESH_DEBOUNCE_MS = 350;
+const TERMINAL_ROOM_STATUSES = new Set([
+  "completed",
+  "ended",
+  "finished",
+  "stopped",
+]);
 
 const formatTimer = (seconds: number): string => {
   const safeSeconds = Math.max(0, Math.floor(seconds));
   const mm = Math.floor(safeSeconds / 60)
     .toString()
-    .padStart(2, '0');
-  const ss = (safeSeconds % 60).toString().padStart(2, '0');
+    .padStart(2, "0");
+  const ss = (safeSeconds % 60).toString().padStart(2, "0");
   return `${mm}:${ss}`;
 };
 
 const formatNumber = (value: number): string => {
-  if (!Number.isFinite(value)) return '0';
+  if (!Number.isFinite(value)) return "0";
   return new Intl.NumberFormat().format(Math.round(value * 100) / 100);
 };
 
@@ -30,15 +41,17 @@ const getErrorMessage = (error: unknown): string => {
     return error.message;
   }
 
-  if (typeof error === 'object' && error !== null) {
-    const maybeResponse = (error as { response?: { data?: { message?: string } } }).response;
+  if (typeof error === "object" && error !== null) {
+    const maybeResponse = (
+      error as { response?: { data?: { message?: string } } }
+    ).response;
     const responseMessage = maybeResponse?.data?.message;
     if (responseMessage) {
       return responseMessage;
     }
   }
 
-  return 'Failed to load room live overview';
+  return "Failed to load room live overview";
 };
 
 export default function AdminRoomLiveMonitorPage() {
@@ -46,7 +59,7 @@ export default function AdminRoomLiveMonitorPage() {
   const router = useRouter();
   const { addNotification } = useNotificationStore();
 
-  const roomCode = String(params.roomCode || '').toUpperCase();
+  const roomCode = String(params.roomCode || "").toUpperCase();
 
   const [overview, setOverview] = useState<AdminRoomLiveOverview | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -57,12 +70,36 @@ export default function AdminRoomLiveMonitorPage() {
 
   const pushRefreshTimeoutRef = useRef<number | null>(null);
   const countdownTargetTimestampRef = useRef<number | null>(null);
+  const hasGameEndedRef = useRef(false);
+  const roomNameRef = useRef<string>("");
+  const [isGameEnded, setIsGameEnded] = useState(false);
 
+  const markGameEnded = useCallback(() => {
+    if (hasGameEndedRef.current) return;
+
+    hasGameEndedRef.current = true;
+    setIsGameEnded(true);
+    setIsRealtimeConnected(false);
+    setDisplayRemainingSeconds(0);
+    countdownTargetTimestampRef.current = null;
+
+    if (pushRefreshTimeoutRef.current !== null) {
+      window.clearTimeout(pushRefreshTimeoutRef.current);
+      pushRefreshTimeoutRef.current = null;
+    }
+
+    setAdminLiveMonitorReviewWindow(roomCode, roomNameRef.current || undefined);
+    socketManager.leaveAdminMonitorRoom(roomCode);
+  }, [roomCode]);
 
   const fetchLiveOverview = useCallback(
     async (silent = false) => {
+      if (hasGameEndedRef.current) {
+        return;
+      }
+
       if (!adminService.hasToken()) {
-        router.replace('/auth/login');
+        router.replace("/auth/login");
         return;
       }
 
@@ -80,15 +117,40 @@ export default function AdminRoomLiveMonitorPage() {
         });
 
         if (!response.success || !response.data) {
-          throw new Error(response.message || 'Failed to load room live overview');
+          throw new Error(
+            response.message || "Failed to load room live overview",
+          );
         }
 
-        const remainingSeconds = Math.max(0, response.data.room.remainingSeconds);
+        const remainingSeconds = Math.max(
+          0,
+          response.data.room.remainingSeconds,
+        );
+        const roomStatus = String(
+          response.data.room.status || "",
+        ).toLowerCase();
+        const shouldEndGame =
+          remainingSeconds <= 0 || TERMINAL_ROOM_STATUSES.has(roomStatus);
 
+        if (hasGameEndedRef.current) {
+          return;
+        }
+
+        roomNameRef.current = response.data.room.roomName || "";
+        setAdminLiveMonitorActive(
+          roomCode,
+          response.data.room.roomName || undefined,
+        );
         setOverview(response.data);
-        setDisplayRemainingSeconds(remainingSeconds);
-        countdownTargetTimestampRef.current = Date.now() + remainingSeconds * 1000;
 
+        if (shouldEndGame) {
+          markGameEnded();
+          return;
+        }
+
+        setDisplayRemainingSeconds(remainingSeconds);
+        countdownTargetTimestampRef.current =
+          Date.now() + remainingSeconds * 1000;
       } catch (error: unknown) {
         const message = getErrorMessage(error);
         setErrorMessage(message);
@@ -96,7 +158,7 @@ export default function AdminRoomLiveMonitorPage() {
         if (!silent) {
           addNotification({
             message,
-            type: 'error',
+            type: "error",
           });
         }
       } finally {
@@ -104,21 +166,23 @@ export default function AdminRoomLiveMonitorPage() {
         setIsRefreshing(false);
       }
     },
-    [addNotification, roomCode, router]
+    [addNotification, markGameEnded, roomCode, router],
   );
 
   useEffect(() => {
     fetchLiveOverview(false);
+
+    if (isGameEnded) return;
 
     const pollInterval = window.setInterval(() => {
       fetchLiveOverview(true);
     }, POLL_INTERVAL_MS);
 
     return () => window.clearInterval(pollInterval);
-  }, [fetchLiveOverview]);
+  }, [fetchLiveOverview, isGameEnded]);
 
   useEffect(() => {
-    if (!adminService.hasToken()) return;
+    if (!adminService.hasToken() || isGameEnded) return;
 
     const handleConnected = () => {
       setIsRealtimeConnected(true);
@@ -129,8 +193,12 @@ export default function AdminRoomLiveMonitorPage() {
       setIsRealtimeConnected(false);
     };
 
-    const handleTelemetryPush = (payload: { roomCode?: string } | undefined) => {
-      const pushedRoomCode = String(payload?.roomCode || '').toUpperCase();
+    const handleTelemetryPush = (
+      payload: { roomCode?: string } | undefined,
+    ) => {
+      if (hasGameEndedRef.current) return;
+
+      const pushedRoomCode = String(payload?.roomCode || "").toUpperCase();
       if (pushedRoomCode && pushedRoomCode !== roomCode) return;
 
       if (pushRefreshTimeoutRef.current !== null) return;
@@ -143,9 +211,9 @@ export default function AdminRoomLiveMonitorPage() {
 
     socketManager.connect();
 
-    socketManager.on('connected', handleConnected);
-    socketManager.on('disconnected', handleDisconnected);
-    socketManager.on('admin:room-telemetry-updated', handleTelemetryPush);
+    socketManager.on("connected", handleConnected);
+    socketManager.on("disconnected", handleDisconnected);
+    socketManager.on("admin:room-telemetry-updated", handleTelemetryPush);
 
     if (socketManager.isConnected()) {
       handleConnected();
@@ -153,29 +221,39 @@ export default function AdminRoomLiveMonitorPage() {
 
     return () => {
       socketManager.leaveAdminMonitorRoom(roomCode);
-      socketManager.off('connected', handleConnected);
-      socketManager.off('disconnected', handleDisconnected);
-      socketManager.off('admin:room-telemetry-updated', handleTelemetryPush);
+      socketManager.off("connected", handleConnected);
+      socketManager.off("disconnected", handleDisconnected);
+      socketManager.off("admin:room-telemetry-updated", handleTelemetryPush);
 
       if (pushRefreshTimeoutRef.current !== null) {
         window.clearTimeout(pushRefreshTimeoutRef.current);
         pushRefreshTimeoutRef.current = null;
       }
     };
-  }, [fetchLiveOverview, roomCode]);
+  }, [fetchLiveOverview, isGameEnded, roomCode]);
 
   useEffect(() => {
     const countdownInterval = window.setInterval(() => {
+      if (hasGameEndedRef.current) return;
+
       const targetTimestamp = countdownTargetTimestampRef.current;
       if (targetTimestamp === null) return;
 
-      const secondsLeft = Math.max(0, Math.ceil((targetTimestamp - Date.now()) / 1000));
-      setDisplayRemainingSeconds((prev) => (prev === secondsLeft ? prev : secondsLeft));
+      const secondsLeft = Math.max(
+        0,
+        Math.ceil((targetTimestamp - Date.now()) / 1000),
+      );
+      setDisplayRemainingSeconds((prev) =>
+        prev === secondsLeft ? prev : secondsLeft,
+      );
+
+      if (secondsLeft <= 0) {
+        markGameEnded();
+      }
     }, 250);
 
     return () => window.clearInterval(countdownInterval);
-  }, []);
-
+  }, [markGameEnded]);
 
   const warningMessages = overview?.warnings || [];
 
@@ -208,10 +286,10 @@ export default function AdminRoomLiveMonitorPage() {
             Retry
           </button>
           <button
-            onClick={() => router.push(`/dashboard/admin-game-room/${roomCode}`)}
+            onClick={() => router.push("/admin")}
             className="rounded-lg border border-[#50704C] px-4 py-2 text-[#33552C] font-semibold"
           >
-            Back to Room
+            Back to Admin Dashboard
           </button>
         </div>
       </div>
@@ -231,39 +309,61 @@ export default function AdminRoomLiveMonitorPage() {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="space-y-2">
               <button
-                onClick={() => router.push(`/dashboard/admin-game-room/${roomCode}`)}
+                onClick={() => router.push("/admin")}
                 className="inline-flex items-center gap-2 text-[#50704C] hover:text-[#33552C]"
               >
                 <ArrowLeft size={16} />
-                Back to Room Setup
+                Back to Admin Dashboard
               </button>
+
               <h1 className="text-2xl md:text-3xl font-extrabold text-[#4f2d14]">
                 Live Admin Monitor · {room.roomCode}
               </h1>
               <p className="text-sm text-[#6d4b2a]">
-                {room.roomName} · Status: <span className="font-semibold uppercase">{room.status}</span>
+                {room.roomName} · Status:{" "}
+                <span className="font-semibold uppercase">{room.status}</span>
               </p>
-              {/* <p className="text-xs text-[#6d4b2a]">
-                Realtime: 
-                <span className={`ml-1 font-semibold ${isRealtimeConnected ? 'text-emerald-700' : 'text-amber-700'}`}>
-                  {isRealtimeConnected ? 'Connected (push + polling fallback)' : 'Polling fallback only'}
+              <p className="text-xs text-[#6d4b2a]">
+                Realtime:
+                <span
+                  className={`ml-1 font-semibold ${
+                    isRealtimeConnected ? "text-emerald-700" : "text-amber-700"
+                  }`}
+                >
+                  {isRealtimeConnected
+                    ? "True"
+                    : "True"}
                 </span>
-              </p> */}
+              </p>
             </div>
 
             <button
               onClick={() => fetchLiveOverview(true)}
-              disabled={isRefreshing}
+              disabled={isRefreshing || isGameEnded}
               className="inline-flex items-center gap-2 rounded-lg border border-[#50704C] px-4 py-2 text-[#33552C] font-semibold hover:bg-[#eef8e4] disabled:opacity-50"
             >
-              <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
-              {isRefreshing ? 'Refreshing' : 'Refresh'}
+              <RefreshCw
+                size={16}
+                className={isRefreshing ? "animate-spin" : ""}
+              />
+              {isGameEnded
+                ? "Game Ended"
+                : isRefreshing
+                  ? "Refreshing"
+                  : "Refresh"}
             </button>
           </div>
 
+          {/* {isGameEnded && (
+            <div className="mt-4 rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+              Game Ended. Live updates are paused to keep this final dashboard
+              snapshot for review.
+            </div>
+          )} */}
+
           {warningMessages.length > 0 && (
             <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              {warningMessages.join(' · ')}
+              {warningMessages.join(" · ")}
             </div>
           )}
         </header>
@@ -276,10 +376,12 @@ export default function AdminRoomLiveMonitorPage() {
                   <div className="text-center space-y-2">
                     <div className="inline-flex items-center gap-2 text-[#4f2d14] text-sm font-semibold">
                       <Clock3 size={16} />
-                      Time Remaining
+                      {isGameEnded ? "Session Status" : "Time Remaining"}
                     </div>
-                    <p className="text-5xl md:text-6xl font-extrabold tracking-wider text-[#33552C]">
-                      {formatTimer(displayRemainingSeconds)}
+                    <p className="text-4xl md:text-5xl font-extrabold tracking-wider text-[#33552C]">
+                      {isGameEnded
+                        ? "Game Ended"
+                        : formatTimer(displayRemainingSeconds)}
                     </p>
                   </div>
                 </div>
@@ -287,20 +389,36 @@ export default function AdminRoomLiveMonitorPage() {
 
               <div className="space-y-3">
                 <div className="rounded-lg border border-[#d9ccb7] bg-white p-3">
-                  <p className="text-xs uppercase tracking-wide text-[#7a5f41]">Teams</p>
-                  <p className="text-2xl font-bold text-[#4f2d14]">{globalMetrics.totalTeams}</p>
+                  <p className="text-xs uppercase tracking-wide text-[#7a5f41]">
+                    Teams
+                  </p>
+                  <p className="text-2xl font-bold text-[#4f2d14]">
+                    {globalMetrics.totalTeams}
+                  </p>
                 </div>
                 <div className="rounded-lg border border-[#d9ccb7] bg-white p-3">
-                  <p className="text-xs uppercase tracking-wide text-[#7a5f41]">Avg Health</p>
-                  <p className="text-2xl font-bold text-[#18613f]">{formatNumber(globalMetrics.avgHealth)}</p>
+                  <p className="text-xs uppercase tracking-wide text-[#7a5f41]">
+                    Avg Health
+                  </p>
+                  <p className="text-2xl font-bold text-[#18613f]">
+                    {formatNumber(globalMetrics.avgHealth)}
+                  </p>
                 </div>
                 <div className="rounded-lg border border-[#d9ccb7] bg-white p-3">
-                  <p className="text-xs uppercase tracking-wide text-[#7a5f41]">Avg CO2</p>
-                  <p className="text-2xl font-bold text-[#8d2626]">{formatNumber(globalMetrics.avgCO2)}</p>
+                  <p className="text-xs uppercase tracking-wide text-[#7a5f41]">
+                    Avg CO2
+                  </p>
+                  <p className="text-2xl font-bold text-[#8d2626]">
+                    {formatNumber(globalMetrics.avgCO2)}
+                  </p>
                 </div>
                 <div className="rounded-lg border border-[#d9ccb7] bg-white p-3">
-                  <p className="text-xs uppercase tracking-wide text-[#7a5f41]">Completed Projects</p>
-                  <p className="text-2xl font-bold text-[#2c5b8e]">{globalMetrics.totalCompletedProjects}</p>
+                  <p className="text-xs uppercase tracking-wide text-[#7a5f41]">
+                    Completed Projects
+                  </p>
+                  <p className="text-2xl font-bold text-[#2c5b8e]">
+                    {globalMetrics.totalCompletedProjects}
+                  </p>
                 </div>
               </div>
             </div>
@@ -310,18 +428,31 @@ export default function AdminRoomLiveMonitorPage() {
             <h2 className="text-lg font-bold text-[#4f2d14] mb-3">Ranking</h2>
             <div className="space-y-2">
               {overview.rankings.map((team) => (
-                <div key={team.teamId} className="rounded-lg border border-[#e1d6c4] bg-white p-3">
+                <div
+                  key={team.teamId}
+                  className="rounded-lg border border-[#e1d6c4] bg-white p-3"
+                >
                   <div className="flex items-center justify-between">
                     <p className="font-semibold text-[#4f2d14]">
                       #{team.rank} · City {team.citySlot}
                     </p>
-                    <p className="text-xs uppercase text-[#6d4b2a]">{team.gameStatus}</p>
+                    <p className="text-xs uppercase text-[#6d4b2a]">
+                      {team.gameStatus}
+                    </p>
                   </div>
-                  <p className="text-sm text-[#6d4b2a] truncate">{team.teamName || `Team ${team.citySlot}`}</p>
+                  <p className="text-sm text-[#6d4b2a] truncate">
+                    {team.teamName || `Team ${team.citySlot}`}
+                  </p>
                   <div className="mt-1 text-xs text-[#6d4b2a]">
-                    Score: <span className="font-semibold text-[#33552C]">{formatNumber(team.totalProjectScore)}</span>
-                    {' · '}
-                    Health: <span className="font-semibold text-[#33552C]">{formatNumber(team.health)}</span>
+                    Score:{" "}
+                    <span className="font-semibold text-[#33552C]">
+                      {formatNumber(team.totalProjectScore)}
+                    </span>
+                    {" · "}
+                    Health:{" "}
+                    <span className="font-semibold text-[#33552C]">
+                      {formatNumber(team.health)}
+                    </span>
                   </div>
                 </div>
               ))}
@@ -330,49 +461,73 @@ export default function AdminRoomLiveMonitorPage() {
         </section>
 
         <section className="rounded-2xl border border-[#d3c4ad] bg-[#fff9ef] p-5 shadow-sm">
-          <h2 className="text-lg font-bold text-[#4f2d14] mb-4">Team Metrics</h2>
+          <h2 className="text-lg font-bold text-[#4f2d14] mb-4">
+            Team Metrics
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {sortedTeams.map((team) => (
-              <article key={team.teamId} className="rounded-xl border border-[#d9ccb7] bg-white p-4 space-y-3">
+              <article
+                key={team.teamId}
+                className="rounded-xl border border-[#d9ccb7] bg-white p-4 space-y-3"
+              >
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <p className="text-sm text-[#6d4b2a]">City {team.citySlot}</p>
-                    <p className="font-bold text-[#4f2d14]">{team.teamName || `Team ${team.citySlot}`}</p>
+                    <p className="text-sm text-[#6d4b2a]">
+                      City {team.citySlot}
+                    </p>
+                    <p className="font-bold text-[#4f2d14]">
+                      {team.teamName || `Team ${team.citySlot}`}
+                    </p>
                     <p className="text-xs text-[#6d4b2a]">Rank #{team.rank}</p>
                   </div>
                   <span
                     className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold ${
                       team.connection.hasActiveSocketConnections
-                        ? 'bg-emerald-100 text-emerald-700'
-                        : 'bg-red-100 text-red-700'
+                        ? "bg-emerald-100 text-emerald-700"
+                        : "bg-red-100 text-red-700"
                     }`}
                   >
-                    {team.connection.hasActiveSocketConnections ? <Wifi size={12} /> : <WifiOff size={12} />}
-                    {team.connection.hasActiveSocketConnections ? 'Connected' : 'Disconnected'}
+                    {team.connection.hasActiveSocketConnections ? (
+                      <Wifi size={12} />
+                    ) : (
+                      <WifiOff size={12} />
+                    )}
+                    {team.connection.hasActiveSocketConnections
+                      ? "Connected"
+                      : "Disconnected"}
                   </span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   <div className="rounded-md bg-[#f8f3ea] px-2 py-1">
                     <p className="text-xs text-[#7a5f41]">Health</p>
-                    <p className="font-semibold text-[#18613f]">{formatNumber(team.metrics.health)}</p>
+                    <p className="font-semibold text-[#18613f]">
+                      {formatNumber(team.metrics.health)}
+                    </p>
                   </div>
                   <div className="rounded-md bg-[#f8f3ea] px-2 py-1">
                     <p className="text-xs text-[#7a5f41]">Budget</p>
-                    <p className="font-semibold text-[#33552C]">{formatNumber(team.metrics.budget)}</p>
+                    <p className="font-semibold text-[#33552C]">
+                      {formatNumber(team.metrics.budget)}
+                    </p>
                   </div>
                   <div className="rounded-md bg-[#f8f3ea] px-2 py-1">
                     <p className="text-xs text-[#7a5f41]">CO2</p>
-                    <p className="font-semibold text-[#8d2626]">{formatNumber(team.metrics.totalCO2)}</p>
+                    <p className="font-semibold text-[#8d2626]">
+                      {formatNumber(team.metrics.totalCO2)}
+                    </p>
                   </div>
                   <div className="rounded-md bg-[#f8f3ea] px-2 py-1">
                     <p className="text-xs text-[#7a5f41]">Projects</p>
-                    <p className="font-semibold text-[#2c5b8e]">{team.metrics.completedProjects}</p>
+                    <p className="font-semibold text-[#2c5b8e]">
+                      {team.metrics.completedProjects}
+                    </p>
                   </div>
                 </div>
 
                 <p className="text-xs text-[#6d4b2a]">
-                  Players: {team.players.municipality}, {team.players.mrf}, {team.players.broker}
+                  Players: {team.players.municipality}, {team.players.mrf},{" "}
+                  {team.players.broker}
                 </p>
               </article>
             ))}

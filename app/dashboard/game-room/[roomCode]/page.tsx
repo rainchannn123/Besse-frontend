@@ -408,7 +408,7 @@ export default function GameRoomPage() {
                 <button
                   onClick={handleLeaveRoom}
                   disabled={isLeaving}
-                  className="flex items-center gap-2 px-4 py-2 border border-[#a94747] text-[#8d2626] rounded-lg hover:bg-[#fff0f0] transition-colors disabled:opacity-50"
+                  className="hidden flex items-center gap-2 px-4 py-2 border border-[#a94747] text-[#8d2626] rounded-lg hover:bg-[#fff0f0] transition-colors disabled:opacity-50"
                 >
                   <LogOut size={16} />
                   {isLeaving ? 'Leaving...' : 'Leave Room'}
